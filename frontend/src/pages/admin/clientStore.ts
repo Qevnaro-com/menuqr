@@ -6,6 +6,12 @@ export interface MenuItemRecord {
   name: string;
   description: string;
   price: string;
+  pricingType?: 'single' | 'half-full' | 'sizes';
+  halfPrice?: string;
+  fullPrice?: string;
+  regPrice?: string;
+  medPrice?: string;
+  largePrice?: string;
   category: string;
   dietType: MenuDietType;
   image: string;
@@ -32,6 +38,7 @@ export interface ClientRecord {
   openingHours: string;
   services: string[];
   menuItems: MenuItemRecord[];
+  heroImage?: string;
   status: string;
   notes: string;
   createdAt: string;

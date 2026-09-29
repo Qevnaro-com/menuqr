@@ -20,12 +20,18 @@ function App() {
       id: item.id,
       name: item.name,
       description: item.description,
-      price: `₹${Number(item.price).toLocaleString('en-IN')}`,
+      price: item.price ? `₹${Number(item.price).toLocaleString('en-IN')}` : '',
+      pricingType: item.pricingType || 'single',
+      halfPrice: item.halfPrice ? `₹${Number(item.halfPrice).toLocaleString('en-IN')}` : '',
+      fullPrice: item.fullPrice ? `₹${Number(item.fullPrice).toLocaleString('en-IN')}` : '',
+      regPrice: item.regPrice ? `₹${Number(item.regPrice).toLocaleString('en-IN')}` : '',
+      medPrice: item.medPrice ? `₹${Number(item.medPrice).toLocaleString('en-IN')}` : '',
+      largePrice: item.largePrice ? `₹${Number(item.largePrice).toLocaleString('en-IN')}` : '',
       category: item.category,
       type: item.dietType,
       img: item.image,
     }))
-    : demoMenuItems;
+    : demoMenuItems.map(item => ({ ...item, pricingType: 'single', halfPrice: '', fullPrice: '', regPrice: '', medPrice: '', largePrice: '' }));
   const categories = ['All', ...new Set(menuItems.map((item) => item.category))];
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -35,8 +41,9 @@ function App() {
     const searchMatch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
     return categoryMatch && searchMatch;
   });
-  const heroImage = menuItems.find((item) => item.img)?.img
-    ?? 'https://images.unsplash.com/photo-1547592180-85f173990554?w=1600&q=85';
+  const heroImage = client?.heroImage
+    || menuItems.find((item) => item.img)?.img
+    || 'https://images.unsplash.com/photo-1547592180-85f173990554?w=1600&q=85';
 
   return (
     <div className="customer-menu">
@@ -57,14 +64,18 @@ function App() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.65, ease: 'easeOut' }}
         >
-          <img className="menu-hero-image" src={heroImage} alt="A selection of freshly prepared dishes" />
-          <div className="menu-hero-shade" />
-          <div className="menu-hero-content">
-            <span className="menu-eyebrow">{client?.category?.replace(/s$/, '') ?? 'A LOCAL FAVOURITE'}</span>
+          <div className="menu-hero-text">
+            <div className="menu-hero-badge">🔥 {client?.category?.replace(/s$/, '') ?? 'HOT & DELICIOUS'}</div>
             <h1>{client?.businessName ?? 'Sharma Dhaba'}</h1>
-            <p>{client?.city ? `Made with care in ${client.city}` : 'Good food. Good company. Always.'}</p>
-            <span className="menu-hero-rule" />
-            <span className="menu-hero-count">{menuItems.length} dishes, made for you</span>
+            <p>{client?.city ? `Made with love in ${client.city}` : 'Satisfy your cravings with our best dishes!'}</p>
+            <div className="menu-hero-stats">
+              <span className="menu-hero-stat">🍽️ {menuItems.length} Dishes</span>
+              <span className="menu-hero-stat">⭐ 4.9 Rated</span>
+            </div>
+          </div>
+          <div className="menu-hero-visual">
+            <div className="menu-hero-visual-bg"></div>
+            <img className="menu-hero-image-new" src={heroImage} alt="Featured dish" />
           </div>
         </motion.section>
 
@@ -107,39 +118,58 @@ function App() {
 
         <section className="menu-dishes" aria-label="Menu dishes">
           <AnimatePresence mode="popLayout">
-            {filteredItems.map((item) => (
-              <motion.div
-                key={item.id}
-                layout
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 8 }}
-                transition={{ duration: 0.28 }}
-                className="menu-dish"
-              >
-                <div className="menu-dish-image-wrap">
-                  <img
-                    src={item.img || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&q=80'}
-                    alt={item.name}
-                    className="menu-dish-image"
-                    loading="lazy"
-                  />
-                </div>
-                <div className="menu-dish-info">
-                  <div className="menu-dish-title-row">
-                    <div className={`menu-diet-mark ${item.type === 'veg' || item.type === 'vegan' ? 'is-veg' : 'is-nonveg'}`} aria-label={item.type === 'veg' || item.type === 'vegan' ? 'Vegetarian' : 'Non-vegetarian'}>
-                      <span />
+            {filteredItems.map((item) => {
+              const actualCategories = categories.filter(c => c !== 'All');
+              const catIndex = actualCategories.indexOf(item.category);
+              const palette = ['#f24e61', '#ff9f1c', '#2ec4b6', '#8338ec', '#ff006e', '#3a86ff', '#fb5607', '#06d6a0'];
+              const itemColor = palette[Math.max(0, catIndex) % palette.length];
+
+              return (
+                <motion.div
+                  key={item.id}
+                  layout
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 8 }}
+                  transition={{ duration: 0.28 }}
+                  className="menu-dish"
+                  style={{ '--dish-bg': itemColor } as React.CSSProperties}
+                >
+                  <div className="menu-dish-info">
+                    <div className="menu-dish-rating">
+                      ★ 4.8
                     </div>
-                    <h3>{item.name}</h3>
+                    <h3 className="menu-dish-title">{item.name}</h3>
+                    {item.description && <p className="menu-dish-description" title={item.description}>{item.description}</p>}
+                    
+                    {item.pricingType === 'single' && <div className="menu-dish-price-btn">{item.price}</div>}
+                    {item.pricingType === 'half-full' && (
+                      <div className="menu-dish-price-variants">
+                        {item.halfPrice && <div className="menu-dish-price-btn"><span className="variant-label">Half</span> {item.halfPrice}</div>}
+                        {item.fullPrice && <div className="menu-dish-price-btn"><span className="variant-label">Full</span> {item.fullPrice}</div>}
+                      </div>
+                    )}
+                    {item.pricingType === 'sizes' && (
+                      <div className="menu-dish-price-variants">
+                        {item.regPrice && <div className="menu-dish-price-btn"><span className="variant-label">Reg</span> {item.regPrice}</div>}
+                        {item.medPrice && <div className="menu-dish-price-btn"><span className="variant-label">Med</span> {item.medPrice}</div>}
+                        {item.largePrice && <div className="menu-dish-price-btn"><span className="variant-label">Lrg</span> {item.largePrice}</div>}
+                      </div>
+                    )}
                   </div>
-                  {item.description && <p className="menu-dish-description">{item.description}</p>}
-                  <div className="menu-dish-footer">
-                    <span className="menu-dish-category">{item.category}</span>
-                    <span className="menu-dish-price">{item.price}</span>
+                  <div className="menu-dish-image-container">
+                    <div className="menu-dish-image-wrap">
+                      <img
+                        src={item.img || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&q=80'}
+                        alt={item.name}
+                        className="menu-dish-image"
+                        loading="lazy"
+                      />
+                    </div>
                   </div>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              );
+            })}
           </AnimatePresence>
 
           {filteredItems.length === 0 && (

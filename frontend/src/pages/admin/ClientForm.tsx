@@ -1,8 +1,8 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Building2, Check, Clock3, CreditCard, MapPin, Save, UserRound } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Building2, Check, Clock3, CreditCard, MapPin, Save, UserRound, ImagePlus } from 'lucide-react';
 import { getClient, getClientDraft, removeClientDraft, saveClient, saveClientDraft, type ClientCategory, type ClientRecord } from './clientStore';
-import MenuItemsEditor from './MenuItemsEditor';
+import MenuItemsEditor, { compressImage } from './MenuItemsEditor';
 
 const categories: { value: ClientCategory; label: string }[] = [
   { value: 'restaurants', label: 'Restaurant' },
@@ -23,7 +23,7 @@ const steps = [
 const emptyClient: Omit<ClientRecord, 'id' | 'createdAt'> = {
   businessName: '', category: 'restaurants', ownerName: '', email: '', phone: '', website: '',
   address: '', city: '', state: '', postalCode: '', country: 'India', menuSlug: '', plan: 'Starter',
-  billingCycle: 'Monthly', monthlyPrice: '', openingHours: '', services: ['Dine-in'], menuItems: [], status: 'Active', notes: '',
+  billingCycle: 'Monthly', monthlyPrice: '', openingHours: '', services: ['Dine-in'], menuItems: [], heroImage: '', status: 'Active', notes: '',
 };
 
 const inputClass = 'mt-2 w-full rounded-lg border border-white/10 bg-[#17211e] px-3.5 py-3 text-sm text-white outline-none transition placeholder:text-[#728079] focus:border-[#e8783c] focus:ring-2 focus:ring-[#e8783c]/20';
@@ -50,7 +50,7 @@ export default function ClientForm() {
       city: existing.city, state: existing.state, postalCode: existing.postalCode, country: existing.country,
       menuSlug: existing.menuSlug, plan: existing.plan, billingCycle: existing.billingCycle,
       monthlyPrice: existing.monthlyPrice, openingHours: existing.openingHours, services: existing.services,
-      menuItems: existing.menuItems ?? [], status: existing.status, notes: existing.notes,
+      menuItems: existing.menuItems ?? [], heroImage: existing.heroImage || '', status: existing.status, notes: existing.notes,
     };
     return emptyClient;
   });
@@ -69,6 +69,16 @@ export default function ClientForm() {
 
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  async function chooseHeroImage(file?: File) {
+    if (!file) return;
+    try {
+      const image = await compressImage(file);
+      update('heroImage', image);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Image upload failed.');
+    }
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -111,6 +121,13 @@ export default function ClientForm() {
             <Field label="Business type *"><select className={inputClass} value={form.category} onChange={(e) => update('category', e.target.value as ClientCategory)}>{categories.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}</select></Field>
             <Field label="Public menu URL *"><div className="mt-2 flex overflow-hidden rounded-lg border border-white/10 bg-[#17211e] focus-within:border-[#e8783c]"><span className="flex items-center border-r border-white/10 px-3 text-xs text-[#84938c]">menuqr.app/menu/</span><input className="min-w-0 flex-1 bg-transparent px-3 py-3 text-sm text-white outline-none placeholder:text-[#728079]" required pattern="[a-z0-9]+(-[a-z0-9]+)*" value={form.menuSlug} onChange={(e) => { setSlugEdited(true); update('menuSlug', slugify(e.target.value)); }} placeholder="green-table" /></div></Field>
             <Field label="Website (optional)"><input className={inputClass} type="url" value={form.website} onChange={(e) => update('website', e.target.value)} placeholder="https://example.com" /></Field>
+            <div className="sm:col-span-2">
+              <span className={labelClass}>Cover/Hero Image (optional)</span>
+              <label className="group relative mt-2 flex h-32 cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-dashed border-white/15 bg-[#17211e] transition hover:border-[#e8783c]/60">
+                {form.heroImage ? <img src={form.heroImage} alt="Cover preview" className="h-full w-full object-cover" /> : <span className="flex flex-col items-center gap-2 text-xs font-semibold text-[#aab7b2]"><ImagePlus size={22} className="text-[#f29a66]" />Choose cover photo</span>}
+                <input type="file" accept="image/*" className="sr-only" onChange={(event) => void chooseHeroImage(event.currentTarget.files?.[0])} />
+              </label>
+            </div>
           </div>
           <fieldset className="mt-5"><legend className={labelClass}>Services offered</legend><div className="mt-3 flex flex-wrap gap-2">{serviceOptions.map((service) => { const selected = form.services.includes(service); return <label key={service} className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${selected ? 'border-[#e8783c]/50 bg-[#e8783c]/10 text-[#ffc19e]' : 'border-white/10 text-[#aab7b2] hover:border-white/20'}`}><input className="accent-[#e8783c]" type="checkbox" checked={selected} onChange={(e) => update('services', e.target.checked ? [...form.services, service] : form.services.filter((item) => item !== service))} />{service}</label>; })}</div></fieldset>
         </section>}

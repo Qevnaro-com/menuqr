@@ -10,7 +10,7 @@ function blankItem(): MenuItemRecord {
   return { id: '', name: '', description: '', price: '', category: 'Main Course', dietType: 'veg', image: '', available: true };
 }
 
-async function compressImage(file: File): Promise<string> {
+export async function compressImage(file: File): Promise<string> {
   if (!file.type.startsWith('image/')) throw new Error('Choose an image file.');
   if (file.size > 12 * 1024 * 1024) throw new Error('Image must be smaller than 12 MB.');
 
@@ -47,8 +47,21 @@ export default function MenuItemsEditor({ items, onChange }: { items: MenuItemRe
   }
 
   function saveItem() {
-    if (!draft.name.trim() || !draft.price || Number(draft.price) < 0) {
-      setError('Add an item name and a valid price to continue.');
+    const pt = draft.pricingType || 'single';
+    if (!draft.name.trim()) {
+      setError('Add an item name to continue.');
+      return;
+    }
+    if (pt === 'single' && (!draft.price || Number(draft.price) < 0)) {
+      setError('Add a valid price to continue.');
+      return;
+    }
+    if (pt === 'half-full' && (!draft.halfPrice && !draft.fullPrice)) {
+      setError('Add at least one portion price (Half or Full).');
+      return;
+    }
+    if (pt === 'sizes' && (!draft.regPrice && !draft.medPrice && !draft.largePrice)) {
+      setError('Add at least one size price (Reg, Med, or Large).');
       return;
     }
     const savedItem = { ...draft, id: editingId ?? crypto.randomUUID(), name: draft.name.trim(), description: draft.description.trim() };
@@ -100,7 +113,22 @@ export default function MenuItemsEditor({ items, onChange }: { items: MenuItemRe
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0"><h3 className="truncate font-bold text-white">{item.name}</h3><p className="mt-1 line-clamp-2 text-xs leading-5 text-[#9eaaa4]">{item.description || 'No description added.'}</p></div>
-                  <span className="shrink-0 font-bold text-[#ffc19e]">₹{Number(item.price).toLocaleString('en-IN')}</span>
+                  <div className="shrink-0 text-right">
+                    {(!item.pricingType || item.pricingType === 'single') && <span className="block font-bold text-[#ffc19e]">₹{Number(item.price).toLocaleString('en-IN')}</span>}
+                    {item.pricingType === 'half-full' && (
+                      <div className="text-xs font-semibold text-[#ffc19e]">
+                        {item.halfPrice && <span>Half: ₹{item.halfPrice} </span>}
+                        {item.fullPrice && <span>Full: ₹{item.fullPrice}</span>}
+                      </div>
+                    )}
+                    {item.pricingType === 'sizes' && (
+                      <div className="text-[10px] font-semibold text-[#ffc19e]">
+                        {item.regPrice && <span>Reg: ₹{item.regPrice} </span>}
+                        {item.medPrice && <span>Med: ₹{item.medPrice} </span>}
+                        {item.largePrice && <span>Lrg: ₹{item.largePrice}</span>}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] font-semibold">
                   <span className="rounded-md bg-white/[0.06] px-2 py-1 text-[#c3cec8]">{item.category}</span>
@@ -123,11 +151,48 @@ export default function MenuItemsEditor({ items, onChange }: { items: MenuItemRe
             <input type="file" accept="image/*" className="sr-only" onChange={(event) => void chooseImage(event.currentTarget.files?.[0])} />
           </label>
           <label className={labelClass}>Item name<input className={inputClass} value={draft.name} maxLength={70} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} placeholder="e.g. Paneer tikka" /></label>
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <label className={labelClass}>Price<input className={inputClass} type="number" min="0" step="0.01" value={draft.price} onChange={(event) => setDraft((current) => ({ ...current, price: event.target.value }))} placeholder="250" /></label>
-            <label className={labelClass}>Diet<select className={inputClass} value={draft.dietType} onChange={(event) => setDraft((current) => ({ ...current, dietType: event.target.value as MenuDietType }))}><option value="veg">Veg</option><option value="non-veg">Non-veg</option><option value="vegan">Vegan</option></select></label>
-          </div>
-          <label className={`${labelClass} mt-4 block`}>Category<select className={inputClass} value={draft.category} onChange={(event) => setDraft((current) => ({ ...current, category: event.target.value }))}>{categories.map((category) => <option key={category}>{category}</option>)}</select></label>
+          <label className={`${labelClass} mt-4 block`}>Category<select className={inputClass} value={draft.category} onChange={(event) => setDraft((current) => {
+            const newCat = event.target.value;
+            let pt = current.pricingType || 'single';
+            if (newCat === 'Breads' && pt === 'half-full') pt = 'sizes';
+            if (newCat !== 'Breads' && pt === 'sizes') pt = 'half-full';
+            return { ...current, category: newCat, pricingType: pt as any };
+          })}>{categories.map((category) => <option key={category}>{category}</option>)}</select></label>
+          
+          <label className={`${labelClass} mt-4 block`}>Pricing Options
+            <select className={inputClass} value={draft.pricingType || 'single'} onChange={(event) => setDraft((current) => ({ ...current, pricingType: event.target.value as any }))}>
+              <option value="single">Single Price (None)</option>
+              {draft.category === 'Breads' ? (
+                <option value="sizes">Sizes (Reg, Med, Large)</option>
+              ) : (
+                <option value="half-full">Portions (Half, Full)</option>
+              )}
+            </select>
+          </label>
+
+          {(!draft.pricingType || draft.pricingType === 'single') && (
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <label className={labelClass}>Price<input className={inputClass} type="number" min="0" step="0.01" value={draft.price} onChange={(event) => setDraft((current) => ({ ...current, price: event.target.value }))} placeholder="250" /></label>
+              <label className={labelClass}>Diet<select className={inputClass} value={draft.dietType} onChange={(event) => setDraft((current) => ({ ...current, dietType: event.target.value as MenuDietType }))}><option value="veg">Veg</option><option value="non-veg">Non-veg</option><option value="vegan">Vegan</option></select></label>
+            </div>
+          )}
+
+          {draft.pricingType === 'half-full' && (
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <label className={labelClass}>Half Price<input className={inputClass} type="number" min="0" step="0.01" value={draft.halfPrice || ''} onChange={(event) => setDraft((current) => ({ ...current, halfPrice: event.target.value }))} placeholder="150" /></label>
+              <label className={labelClass}>Full Price<input className={inputClass} type="number" min="0" step="0.01" value={draft.fullPrice || ''} onChange={(event) => setDraft((current) => ({ ...current, fullPrice: event.target.value }))} placeholder="250" /></label>
+              <label className={`${labelClass} col-span-2`}>Diet<select className={inputClass} value={draft.dietType} onChange={(event) => setDraft((current) => ({ ...current, dietType: event.target.value as MenuDietType }))}><option value="veg">Veg</option><option value="non-veg">Non-veg</option><option value="vegan">Vegan</option></select></label>
+            </div>
+          )}
+
+          {draft.pricingType === 'sizes' && (
+            <div className="mt-4 grid grid-cols-3 gap-3">
+              <label className={labelClass}>Reg Price<input className={inputClass} type="number" min="0" step="0.01" value={draft.regPrice || ''} onChange={(event) => setDraft((current) => ({ ...current, regPrice: event.target.value }))} placeholder="100" /></label>
+              <label className={labelClass}>Med Price<input className={inputClass} type="number" min="0" step="0.01" value={draft.medPrice || ''} onChange={(event) => setDraft((current) => ({ ...current, medPrice: event.target.value }))} placeholder="150" /></label>
+              <label className={labelClass}>Large Price<input className={inputClass} type="number" min="0" step="0.01" value={draft.largePrice || ''} onChange={(event) => setDraft((current) => ({ ...current, largePrice: event.target.value }))} placeholder="200" /></label>
+              <label className={`${labelClass} col-span-3`}>Diet<select className={inputClass} value={draft.dietType} onChange={(event) => setDraft((current) => ({ ...current, dietType: event.target.value as MenuDietType }))}><option value="veg">Veg</option><option value="non-veg">Non-veg</option><option value="vegan">Vegan</option></select></label>
+            </div>
+          )}
           <label className={`${labelClass} mt-4 block`}>Description<textarea className={`${inputClass} min-h-20 resize-y`} maxLength={240} value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} placeholder="Ingredients, portion size, or what makes it special" /></label>
           <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm font-semibold text-[#c5d0ca]"><input type="checkbox" className="accent-[#e8783c]" checked={draft.available} onChange={(event) => setDraft((current) => ({ ...current, available: event.target.checked }))} /> Available to order</label>
           {error && <p role="alert" className="mt-3 text-xs font-medium text-rose-300">{error}</p>}

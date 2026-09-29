@@ -1,0 +1,92 @@
+.admin-shell {
+  --admin-canvas: #151c19;
+  --admin-panel: #202a26;
+  --admin-line: rgba(225, 237, 230, 0.09);
+  --admin-muted: #a3b0a9;
+  --admin-accent: #e8783c;
+  color-scheme: dark;
+  background: var(--admin-canvas);
+}
+
+.admin-shell main {
+  background: var(--admin-canvas);
+}
+
+.admin-scroll {
+  scrollbar-color: #47564f transparent;
+  scrollbar-width: thin;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.012) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.012) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.admin-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.admin-scroll::-webkit-scrollbar-thumb {
+  border: 2px solid var(--admin-canvas);
+  border-radius: 999px;
+  background: #47564f;
+}
+
+.admin-dashboard .admin-stat-card {
+  animation: admin-arrive 420ms both;
+  animation-delay: calc(var(--card-order, 0) * 65ms);
+}
+
+.admin-dashboard .admin-stat-card > div:first-child {
+  border-color: var(--admin-line);
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(39, 51, 46, 0.98), rgba(29, 39, 35, 0.98));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.13);
+  backdrop-filter: none;
+}
+
+.admin-dashboard .admin-stat-card:hover > div:first-child {
+  border-color: rgba(232, 120, 60, 0.35);
+  transform: translateY(-2px);
+  transition: border-color 180ms ease, transform 180ms ease;
+}
+
+.admin-dashboard .admin-panel {
+  border-color: var(--admin-line);
+  border-radius: 18px;
+  background: rgba(32, 42, 38, 0.88);
+  backdrop-filter: none;
+}
+
+.admin-empty-page {
+  animation: admin-arrive 320ms ease-out both;
+}
+
+.admin-empty-page h1 {
+  color: #edf2ef;
+}
+
+.admin-empty-page p {
+  color: var(--admin-muted);
+}
+
+@keyframes admin-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(9px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-shell *,
+  .admin-shell *::before,
+  .admin-shell *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

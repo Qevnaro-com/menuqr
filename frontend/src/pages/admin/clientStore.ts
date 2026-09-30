@@ -73,11 +73,12 @@ const migrationStorageKey = 'menuqr.apiMigration.v1';
 
 type ClientDraft = Omit<ClientRecord, 'id' | 'createdAt'>;
 let migrationPromise: Promise<void> | undefined;
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? '';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`/api${path}`, {
+  const response = await fetch(`${apiBaseUrl}/api${path}`, {
     ...init,
-    credentials: 'same-origin',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json', ...init?.headers },
   });
   if (!response.ok) {

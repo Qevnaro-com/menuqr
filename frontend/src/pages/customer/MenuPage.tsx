@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, MapPin, ChefHat, UtensilsCrossed, Clock3, Globe2 } from 'lucide-react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { getClientByMenuSlug, type PublicMenuRecord } from '../admin/clientStore';
 import './MenuPage.css';
 
@@ -60,7 +60,7 @@ function App() {
   if (isLoading || loadError || !client) {
     return (
       <div className="customer-menu">
-        <header className="menu-topbar"><a className="menu-wordmark" href="#top" aria-label="MenuQR menu"><span className="menu-brand-icon"><ChefHat size={19} strokeWidth={2} /></span><span>Menu<span className="menu-brand-accent">QR</span></span></a></header>
+        <header className="menu-topbar"><Link className="menu-wordmark" to={`/menu/${slug}#top`} aria-label="MenuQR menu"><span className="menu-brand-icon"><ChefHat size={19} strokeWidth={2} /></span><span>Menu<span className="menu-brand-accent">QR</span></span></Link></header>
         <main id="top" className="menu-main"><div className="menu-empty-state" role={loadError ? 'alert' : 'status'}>{loadError || 'Preparing this menu…'}</div></main>
       </div>
     );
@@ -69,10 +69,10 @@ function App() {
   return (
     <div className="customer-menu">
       <header className="menu-topbar">
-        <a className="menu-wordmark" href="#top" aria-label="MenuQR menu">
+        <Link className="menu-wordmark" to={`/menu/${slug}#top`} aria-label="MenuQR menu">
           <span className="menu-brand-icon"><ChefHat size={19} strokeWidth={2} /></span>
           <span>Menu<span className="menu-brand-accent">QR</span></span>
-        </a>
+        </Link>
         {client?.city && (
           <span className="menu-location"><MapPin size={14} />{[client.city, client.state].filter(Boolean).join(', ')}</span>
         )}

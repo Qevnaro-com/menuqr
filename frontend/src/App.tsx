@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ChefHat } from 'lucide-react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useMatch } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, useLocation, useMatch } from 'react-router-dom';
+import HomePage from './pages/HomePage';
 import MenuPage from './pages/customer/MenuPage';
 import AdminLayout from './layouts/AdminLayout';
 import AdminLogin from './pages/admin/AdminLogin';
@@ -69,6 +70,8 @@ function AppRoutes() {
   return (
     <>
       <Routes>
+        <Route path="/" element={<HomePage />} />
+
         {/* Customer Menu Route */}
         <Route path="/menu/:slug" element={<MenuPage key={menuSlug} />} />
 
@@ -87,7 +90,7 @@ function AppRoutes() {
           <Route path="settings" element={<Settings />} />
         </Route>
 
-        <Route path="*" element={<Navigate to="/admin/login" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       {isLoading && (
         <div className="app-loader" role="status" aria-live="polite" aria-label={`Loading ${loaderName}`}>
@@ -106,9 +109,20 @@ function AppRoutes() {
 }
 
 export default function App() {
+  if (
+    /^\/menu\/[^/]+\/?$/.test(window.location.pathname) &&
+    !window.location.hash.startsWith('#/')
+  ) {
+    window.history.replaceState(
+      null,
+      '',
+      `/#${window.location.pathname}${window.location.search}${window.location.hash}`
+    );
+  }
+
   return (
-    <BrowserRouter>
+    <HashRouter>
       <AppRoutes />
-    </BrowserRouter>
+    </HashRouter>
   );
 }

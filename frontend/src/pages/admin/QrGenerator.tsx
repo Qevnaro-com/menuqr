@@ -18,7 +18,7 @@ export default function QrGenerator() {
   const activeClients = clients.filter((client) => client.status.toLowerCase() === 'active' && client.menuSlug);
   const selectedClient = activeClients.find((client) => client.id === selectedId);
   const menuUrl = selectedClient
-    ? new URL(`/menu/${encodeURIComponent(selectedClient.menuSlug)}`, window.location.origin).toString()
+    ? `${window.location.origin}/#/menu/${encodeURIComponent(selectedClient.menuSlug)}`
     : '';
   const qrImage = qrResult?.url === menuUrl ? qrResult.image : '';
   const error = (qrError?.url === menuUrl ? qrError.message : '') || copyError;

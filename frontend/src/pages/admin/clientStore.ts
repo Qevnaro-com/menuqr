@@ -47,6 +47,7 @@ export interface ClientRecord {
 export interface PublicMenuRecord {
   businessName: string;
   category: ClientCategory;
+  phone: string;
   address: string;
   city: string;
   state: string;

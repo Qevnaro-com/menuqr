@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, MapPin, ChefHat, UtensilsCrossed, Clock3, Globe2 } from 'lucide-react';
+import { Search, MapPin, ChefHat, UtensilsCrossed, Clock3, Globe2, Phone } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { getClientByMenuSlug, type PublicMenuRecord } from '../admin/clientStore';
 import './MenuPage.css';
@@ -99,9 +99,10 @@ function App() {
           </div>
         </motion.section>
 
-        {(client.address || client.openingHours || client.services.length > 0 || client.website) && (
+        {(client.address || client.phone || client.openingHours || client.services.length > 0 || client.website) && (
           <section className="menu-business-details" aria-label="Business details">
             {(client.address || client.city || client.state) && <div className="menu-business-detail"><MapPin size={16} aria-hidden="true" /><span>{[client.address, client.city, client.state].filter(Boolean).join(', ')}</span></div>}
+            {client.phone && <a className="menu-business-detail" href={`tel:${client.phone.replace(/[^\d+]/g, '')}`}><Phone size={16} aria-hidden="true" /><span>{client.phone}</span></a>}
             {client.openingHours && <div className="menu-business-detail"><Clock3 size={16} aria-hidden="true" /><span>{client.openingHours}</span></div>}
             {client.services.length > 0 && <div className="menu-business-services">{client.services.map((service) => <span key={service}>{service}</span>)}</div>}
             {client.website && <a className="menu-business-detail" href={client.website} target="_blank" rel="noreferrer"><Globe2 size={16} aria-hidden="true" /><span>Website</span></a>}

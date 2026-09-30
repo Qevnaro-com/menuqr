@@ -681,3 +681,101 @@
   }
 }
 
+.customer-menu {
+  --menu-bg: #1b1d1a;
+  --menu-surface: #272a26;
+  --menu-ink: #f4f1e7;
+  --menu-muted: #c1c2b9;
+  --menu-accent: #ffd51b;
+  --menu-line: rgba(242, 240, 228, 0.26);
+  background-color: var(--menu-bg);
+  background-image:
+    radial-gradient(circle, rgba(235, 232, 218, 0.12) 0.7px, transparent 0.9px),
+    radial-gradient(circle, rgba(0, 0, 0, 0.35) 0.8px, transparent 1px),
+    repeating-linear-gradient(112deg, transparent 0 7px, rgba(255, 255, 255, 0.018) 8px, transparent 9px 16px);
+  background-position: 0 0, 7px 11px, center;
+  background-size: 17px 19px, 23px 29px, auto;
+  background-attachment: fixed;
+}
+
+.menu-topbar {
+  border-bottom-color: var(--menu-line);
+}
+
+.menu-wordmark,
+.menu-brand-accent {
+  color: var(--menu-ink);
+}
+
+.menu-brand-icon {
+  border-color: var(--menu-accent);
+  color: var(--menu-accent);
+}
+
+.menu-business-details {
+  border-bottom-color: var(--menu-line);
+  color: var(--menu-muted);
+}
+
+.menu-business-detail svg,
+.menu-eyebrow-light {
+  color: var(--menu-accent);
+}
+
+.menu-business-services span {
+  border-color: var(--menu-line);
+  color: var(--menu-ink);
+}
+
+.menu-section-heading h2 {
+  color: var(--menu-ink);
+}
+
+.menu-result-count {
+  color: var(--menu-muted);
+}
+
+.menu-search {
+  border-color: var(--menu-line);
+  background: var(--menu-surface);
+  color: var(--menu-accent);
+}
+
+.menu-search input {
+  color: var(--menu-ink);
+}
+
+.menu-search input::placeholder {
+  color: var(--menu-muted);
+}
+
+.menu-category {
+  border-color: var(--menu-line);
+  color: var(--menu-ink);
+}
+
+.menu-category:hover {
+  border-color: var(--menu-accent);
+  color: var(--menu-ink);
+}
+
+.menu-category.is-active {
+  border-color: var(--menu-accent);
+  background: var(--menu-accent);
+  color: #20211e;
+  box-shadow: 0 4px 12px rgba(255, 213, 27, 0.16);
+}
+
+.menu-footer {
+  border-top-color: var(--menu-line);
+  color: var(--menu-muted);
+}
+
+.menu-footer strong {
+  color: var(--menu-accent);
+}
+
+.menu-empty-state {
+  color: var(--menu-muted);
+}
+

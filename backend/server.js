@@ -159,6 +159,7 @@ function toPublicMenu(client) {
   return {
     businessName: client.businessName,
     category: client.category,
+    phone: client.phone,
     address: client.address,
     city: client.city,
     state: client.state,

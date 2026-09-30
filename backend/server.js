@@ -1,61 +1,25 @@
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
+import { setServers } from 'node:dns';
 import { createServer } from 'node:http';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { config as loadEnv } from 'dotenv';
+import { MongoClient } from 'mongodb';
 
 const directory = dirname(fileURLToPath(import.meta.url));
-const dataDirectory = join(directory, 'data');
-const dataFile = join(dataDirectory, 'clients.json');
+loadEnv({ path: join(directory, '.env') });
+const dnsServers = (process.env.MONGODB_DNS_SERVERS || '').split(',').map((server) => server.trim()).filter(Boolean);
+if (dnsServers.length > 0) setServers(dnsServers);
+const legacyDataFile = join(directory, 'data', 'clients.json');
 const port = Number(process.env.API_PORT || 3001);
 const maxBodyBytes = 20 * 1024 * 1024;
 const adminPassword = process.env.ADMIN_PASSWORD || 'MenuQR@2026!';
 const adminPasswordHash = createHash('sha256').update(adminPassword).digest();
 const sessionDurationSeconds = 8 * 60 * 60;
+const loginLockDurationMs = 60 * 1000;
 const categories = new Set(['restaurants', 'dhabas', 'cafes']);
-const sessions = new Map();
 const loginAttempts = new Map();
-
-const seedClients = [
-  {
-    id: 'seed-sharma-dhaba', businessName: 'Sharma Dhaba', category: 'dhabas', ownerName: 'Amit Sharma',
-    email: 'hello@sharmadhaba.example', phone: '+91 98765 43210', website: '', address: 'NH-44, Murthal Road',
-    city: 'Sonipat', state: 'Haryana', postalCode: '131027', country: 'India', menuSlug: 'sharma-dhaba',
-    plan: 'Basic', billingCycle: 'Monthly', monthlyPrice: '1499', openingHours: 'Daily: 8:00 AM – 11:00 PM',
-    services: ['Dine-in', 'Takeaway'], heroImage: 'https://images.unsplash.com/photo-1547592180-85f173990554?w=1600&q=85',
-    status: 'Active', notes: '', createdAt: '2025-11-14T08:30:00.000Z',
-    menuItems: [
-      { id: 'sharma-paneer-tikka', name: 'Paneer Tikka', description: 'Smoky paneer with house spices.', price: '250', pricingType: 'single', category: 'Starters', dietType: 'veg', image: 'https://images.unsplash.com/photo-1567158763566-50794ce8b9a1?w=700&q=80', available: true },
-      { id: 'sharma-chicken-biryani', name: 'Chicken Biryani', description: 'Slow-cooked basmati rice with aromatic spices.', price: '350', pricingType: 'single', category: 'Main Course', dietType: 'non-veg', image: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=700&q=80', available: true },
-      { id: 'sharma-tandoori-roti', name: 'Tandoori Roti', description: 'Freshly baked in the clay oven.', price: '30', pricingType: 'single', category: 'Breads', dietType: 'veg', image: 'https://images.unsplash.com/photo-1626200419188-3caeb0064a78?w=700&q=80', available: true },
-      { id: 'sharma-mojito', name: 'Mojito', description: 'Mint, lime, and sparkling soda.', price: '150', pricingType: 'single', category: 'Beverages', dietType: 'vegan', image: 'https://images.unsplash.com/photo-1551538827-9c037cb4f32a?w=700&q=80', available: true },
-    ],
-  },
-  {
-    id: 'seed-green-table', businessName: 'The Green Table', category: 'restaurants', ownerName: 'Neha Kapoor',
-    email: 'team@greentable.example', phone: '+91 98111 22334', website: 'https://example.com', address: '12, Khan Market',
-    city: 'New Delhi', state: 'Delhi', postalCode: '110003', country: 'India', menuSlug: 'the-green-table',
-    plan: 'Pro', billingCycle: 'Monthly', monthlyPrice: '2999', openingHours: 'Mon–Sun: 11:00 AM – 10:30 PM',
-    services: ['Dine-in', 'Takeaway', 'Delivery'], heroImage: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1600&q=85',
-    status: 'Active', notes: '', createdAt: '2026-01-22T10:15:00.000Z',
-    menuItems: [
-      { id: 'green-table-salad', name: 'Garden Greens', description: 'Seasonal leaves, citrus dressing, toasted seeds.', price: '320', pricingType: 'single', category: 'Starters', dietType: 'vegan', image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=700&q=80', available: true },
-      { id: 'green-table-paneer', name: 'Charred Paneer Bowl', description: 'Grilled paneer, herbed rice, and house chutney.', price: '420', pricingType: 'single', category: 'Main Course', dietType: 'veg', image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=700&q=80', available: true },
-    ],
-  },
-  {
-    id: 'seed-brew-beans', businessName: 'Brew Beans Cafe', category: 'cafes', ownerName: 'Rohan Mehta',
-    email: 'hello@brewbeans.example', phone: '+91 98450 11223', website: '', address: '44, 5th Block, Koramangala',
-    city: 'Bengaluru', state: 'Karnataka', postalCode: '560095', country: 'India', menuSlug: 'brew-beans-cafe',
-    plan: 'Starter', billingCycle: 'Monthly', monthlyPrice: '999', openingHours: 'Daily: 9:00 AM – 9:00 PM',
-    services: ['Dine-in', 'Takeaway'], heroImage: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=1600&q=85',
-    status: 'Active', notes: '', createdAt: '2026-03-05T06:45:00.000Z',
-    menuItems: [
-      { id: 'brew-cold-coffee', name: 'Classic Cold Coffee', description: 'Slow-brewed coffee, chilled milk, and a touch of cocoa.', price: '210', pricingType: 'single', category: 'Beverages', dietType: 'veg', image: 'https://images.unsplash.com/photo-1461023058943-07fcbe16d735?w=700&q=80', available: true },
-      { id: 'brew-brownie', name: 'Walnut Brownie', description: 'Warm chocolate brownie with toasted walnuts.', price: '180', pricingType: 'single', category: 'Desserts', dietType: 'veg', image: 'https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=700&q=80', available: true },
-    ],
-  },
-];
 
 function apiError(status, message) {
   const error = new Error(message);
@@ -78,15 +42,10 @@ function getSessionToken(request) {
   return sessionCookie?.slice('menuqr_admin_session='.length);
 }
 
-function hasAdminSession(request) {
+async function hasAdminSession(request) {
   const token = getSessionToken(request);
-  const expiresAt = token ? sessions.get(token) : undefined;
-  if (!expiresAt) return false;
-  if (expiresAt <= Date.now()) {
-    sessions.delete(token);
-    return false;
-  }
-  return true;
+  if (!token) return false;
+  return Boolean(await adminSessions.findOne({ token, expiresAt: { $gt: new Date() } }, { projection: { _id: 1 } }));
 }
 
 function hasCorrectAdminPassword(password) {
@@ -182,30 +141,39 @@ function toPublicMenu(client) {
   };
 }
 
-let clients;
-let writeQueue = Promise.resolve();
+let mongoClient;
+let clientCollection;
+let adminSessions;
 
 async function initializeStore() {
-  await mkdir(dataDirectory, { recursive: true });
-  try {
-    const saved = JSON.parse(await readFile(dataFile, 'utf8'));
-    if (!Array.isArray(saved)) throw new Error('Stored client data must be a list.');
-    clients = saved;
-  } catch (error) {
-    if (error.code !== 'ENOENT') throw error;
-    clients = seedClients;
-    await writeFile(dataFile, JSON.stringify(clients, null, 2), 'utf8');
-  }
-}
+  const uri = process.env.MONGODB_URI;
+  if (!uri) throw new Error('MONGODB_URI is required. Configure your MongoDB connection string before starting the API.');
 
-function persistClients() {
-  const snapshot = JSON.stringify(clients, null, 2);
-  writeQueue = writeQueue.then(async () => {
-    const temporaryFile = `${dataFile}.tmp`;
-    await writeFile(temporaryFile, snapshot, 'utf8');
-    await rename(temporaryFile, dataFile);
-  });
-  return writeQueue;
+  mongoClient = new MongoClient(uri);
+  await mongoClient.connect();
+  const database = mongoClient.db(process.env.MONGODB_DATABASE || 'menuqr');
+  clientCollection = database.collection('clients');
+  adminSessions = database.collection('admin_sessions');
+  await Promise.all([
+    clientCollection.createIndex({ id: 1 }, { unique: true }),
+    clientCollection.createIndex({ menuSlug: 1 }, { unique: true }),
+    adminSessions.createIndex({ token: 1 }, { unique: true }),
+    adminSessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+  ]);
+
+  if (await clientCollection.estimatedDocumentCount() === 0) {
+    let importedClients = [];
+    try {
+      const saved = JSON.parse(await readFile(legacyDataFile, 'utf8'));
+      if (Array.isArray(saved)) importedClients = saved.filter((client) => !String(client.id).startsWith('seed-'));
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+    if (importedClients.length > 0) await clientCollection.insertMany(importedClients);
+    console.log(`Imported ${importedClients.length} client records into MongoDB.`);
+  }
+
+  console.log(`Connected to MongoDB database "${database.databaseName}".`);
 }
 
 const server = createServer(async (request, response) => {
@@ -218,12 +186,12 @@ const server = createServer(async (request, response) => {
 
   try {
     if (request.method === 'GET' && url.pathname === '/api/health') {
-      sendJson(response, 200, { status: 'ok', storage: 'json-file', clients: clients.length });
+      sendJson(response, 200, { status: 'ok', storage: 'mongodb', clients: await clientCollection.countDocuments() });
       return;
     }
 
     if (request.method === 'GET' && url.pathname === '/api/auth/session') {
-      sendJson(response, 200, { authenticated: hasAdminSession(request) });
+      sendJson(response, 200, { authenticated: await hasAdminSession(request) });
       return;
     }
 
@@ -231,7 +199,7 @@ const server = createServer(async (request, response) => {
       const address = request.socket.remoteAddress ?? 'unknown';
       const now = Date.now();
       const attempt = loginAttempts.get(address);
-      if (attempt?.lockedUntil > now) throw apiError(429, 'Too many login attempts. Try again in 15 minutes.');
+      if (attempt?.lockedUntil > now) throw apiError(429, 'Too many login attempts. Try again in 1 minute.');
 
       const input = await readJson(request);
       if (!hasCorrectAdminPassword(input?.password)) {
@@ -239,14 +207,15 @@ const server = createServer(async (request, response) => {
           ? attempt
           : { count: 0, windowStartedAt: now, lockedUntil: 0 };
         currentAttempt.count += 1;
-        if (currentAttempt.count >= 5) currentAttempt.lockedUntil = now + 15 * 60 * 1000;
+        if (currentAttempt.count >= 5) currentAttempt.lockedUntil = now + loginLockDurationMs;
         loginAttempts.set(address, currentAttempt);
         throw apiError(401, 'Incorrect admin password.');
       }
 
       loginAttempts.delete(address);
       const token = randomUUID();
-      sessions.set(token, now + sessionDurationSeconds * 1000);
+      const expiresAt = new Date(now + sessionDurationSeconds * 1000);
+      await adminSessions.insertOne({ token, expiresAt });
       const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
       sendJson(response, 200, { authenticated: true }, {
         'Set-Cookie': `menuqr_admin_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${sessionDurationSeconds}${secure}`,
@@ -256,47 +225,48 @@ const server = createServer(async (request, response) => {
 
     if (request.method === 'POST' && url.pathname === '/api/auth/logout') {
       const token = getSessionToken(request);
-      if (token) sessions.delete(token);
+      if (token) await adminSessions.deleteOne({ token });
       sendJson(response, 200, { authenticated: false }, {
         'Set-Cookie': 'menuqr_admin_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0',
       });
       return;
     }
 
-    if (url.pathname.startsWith('/api/admin/') && !hasAdminSession(request)) {
+    if (url.pathname.startsWith('/api/admin/') && !await hasAdminSession(request)) {
       throw apiError(401, 'Admin login required.');
     }
 
     if (request.method === 'GET' && url.pathname === '/api/admin/clients') {
-      sendJson(response, 200, [...clients].sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+      const records = await clientCollection.find({}, { projection: { _id: 0 } }).sort({ createdAt: -1 }).toArray();
+      sendJson(response, 200, records);
       return;
     }
 
     const adminClientMatch = url.pathname.match(/^\/api\/admin\/clients\/([^/]+)$/);
     if (adminClientMatch) {
       const id = decodeURIComponent(adminClientMatch[1]);
-      const index = clients.findIndex((client) => client.id === id);
 
       if (request.method === 'GET') {
-        if (index < 0) throw apiError(404, 'Client not found.');
-        sendJson(response, 200, clients[index]);
+        const client = await clientCollection.findOne({ id }, { projection: { _id: 0 } });
+        if (!client) throw apiError(404, 'Client not found.');
+        sendJson(response, 200, client);
         return;
       }
 
       if (request.method === 'PUT') {
-        if (index < 0) throw apiError(404, 'Client not found.');
-        const updated = validateClient(await readJson(request), id, clients[index].createdAt);
-        if (clients.some((client) => client.id !== id && client.menuSlug === updated.menuSlug)) throw apiError(409, 'That menu URL is already in use.');
-        clients[index] = updated;
-        await persistClients();
+        const current = await clientCollection.findOne({ id }, { projection: { _id: 0 } });
+        if (!current) throw apiError(404, 'Client not found.');
+        const updated = validateClient(await readJson(request), id, current.createdAt);
+        const conflict = await clientCollection.findOne({ menuSlug: updated.menuSlug, id: { $ne: id } }, { projection: { _id: 1 } });
+        if (conflict) throw apiError(409, 'That menu URL is already in use.');
+        await clientCollection.updateOne({ id }, { $set: updated });
         sendJson(response, 200, updated);
         return;
       }
 
       if (request.method === 'DELETE') {
-        if (index < 0) throw apiError(404, 'Client not found.');
-        clients = clients.filter((client) => client.id !== id);
-        await persistClients();
+        const result = await clientCollection.deleteOne({ id });
+        if (result.deletedCount === 0) throw apiError(404, 'Client not found.');
         response.writeHead(204);
         response.end();
         return;
@@ -307,10 +277,9 @@ const server = createServer(async (request, response) => {
       const input = await readJson(request);
       const requestedId = typeof input?.id === 'string' && input.id.length <= 100 ? input.id : randomUUID();
       const client = validateClient(input, requestedId, new Date().toISOString());
-      if (clients.some((entry) => entry.id === client.id)) throw apiError(409, 'That client ID is already in use.');
-      if (clients.some((entry) => entry.menuSlug === client.menuSlug)) throw apiError(409, 'That menu URL is already in use.');
-      clients.unshift(client);
-      await persistClients();
+      if (await clientCollection.findOne({ id: client.id }, { projection: { _id: 1 } })) throw apiError(409, 'That client ID is already in use.');
+      if (await clientCollection.findOne({ menuSlug: client.menuSlug }, { projection: { _id: 1 } })) throw apiError(409, 'That menu URL is already in use.');
+      await clientCollection.insertOne(client);
       sendJson(response, 201, client);
       return;
     }
@@ -318,8 +287,8 @@ const server = createServer(async (request, response) => {
     const publicMenuMatch = url.pathname.match(/^\/api\/public\/menus\/([^/]+)$/);
     if (request.method === 'GET' && publicMenuMatch) {
       const slug = decodeURIComponent(publicMenuMatch[1]);
-      const client = clients.find((entry) => entry.menuSlug === slug && entry.status.toLowerCase() === 'active');
-      if (!client) throw apiError(404, 'This menu is unavailable.');
+      const client = await clientCollection.findOne({ menuSlug: slug }, { projection: { _id: 0 } });
+      if (!client || client.status.toLowerCase() !== 'active') throw apiError(404, 'This menu is unavailable.');
       sendJson(response, 200, toPublicMenu(client));
       return;
     }
@@ -327,7 +296,8 @@ const server = createServer(async (request, response) => {
     throw apiError(404, 'API route not found.');
   } catch (error) {
     console.error(`[api] ${request.method} ${url.pathname}:`, error.message);
-    sendJson(response, error.status || 500, { error: error.status ? error.message : 'The server could not complete this request.' });
+    const status = error.status || (error.code === 11000 ? 409 : 500);
+    sendJson(response, status, { error: error.status || error.code === 11000 ? error.message : 'The server could not complete this request.' });
   }
 });
 

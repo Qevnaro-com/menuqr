@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LayoutDashboard, Utensils, Store, Coffee, QrCode, Settings, Menu, X, ChefHat, Sparkles, Bell, ClipboardPlus, LogOut } from 'lucide-react';
-import { logoutAdmin } from '../pages/admin/clientStore';
+import { getApiHealth, logoutAdmin } from '../pages/admin/clientStore';
 import '../App.css';
 
 const navItems = [
@@ -17,6 +17,7 @@ const navItems = [
 
 export default function AdminLayout() {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const [apiStatus, setApiStatus] = useState<'checking' | 'online' | 'offline'>('checking');
   const [logoutError, setLogoutError] = useState('');
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const location = useLocation();
@@ -26,6 +27,23 @@ export default function AdminLayout() {
     : navItems.find((item) => item.path === location.pathname)?.label ?? 'Admin Console';
 
   const toggleSidebar = () => setSidebarOpen(!isSidebarOpen);
+
+  useEffect(() => {
+    let isCurrent = true;
+    const checkApi = () => {
+      void getApiHealth().then(() => {
+        if (isCurrent) setApiStatus('online');
+      }).catch(() => {
+        if (isCurrent) setApiStatus('offline');
+      });
+    };
+    checkApi();
+    const timer = window.setInterval(checkApi, 30_000);
+    return () => {
+      isCurrent = false;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   async function signOut() {
     setIsLoggingOut(true);
@@ -110,10 +128,10 @@ export default function AdminLayout() {
            <p className="relative z-10 mb-3 text-[10px] font-bold uppercase tracking-[0.13em] text-[#aab7b2]">System Status</p>
            <div className="flex items-center gap-3 relative z-10">
               <div className="relative flex h-2.5 w-2.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-50 motion-reduce:animate-none"></span>
-                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400"></span>
+                {apiStatus === 'online' && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-50 motion-reduce:animate-none"></span>}
+                <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${apiStatus === 'online' ? 'bg-emerald-400' : apiStatus === 'offline' ? 'bg-rose-400' : 'bg-amber-300'}`}></span>
               </div>
-              <span className="text-xs font-semibold text-white">All systems operational</span>
+              <span className="text-xs font-semibold text-white">{apiStatus === 'online' ? 'MongoDB connected' : apiStatus === 'offline' ? 'API unavailable' : 'Checking connection'}</span>
            </div>
               </div>
       </motion.aside>
@@ -142,11 +160,11 @@ export default function AdminLayout() {
               <div className="h-8 w-px bg-white/10" />
               <div className="group flex cursor-pointer items-center gap-3">
                 <div className="text-right hidden sm:block">
-                  <p className="text-sm font-bold leading-tight text-[#edf2ef]">Vikas Admin</p>
-                  <p className="mt-1 text-[11px] font-semibold text-[#f29a66]">Super User</p>
+                  <p className="text-sm font-bold leading-tight text-[#edf2ef]">Admin</p>
+                  <p className="mt-1 text-[11px] font-semibold text-[#f29a66]">Signed in</p>
                 </div>
-                <div className="h-10 w-10 overflow-hidden rounded-xl border border-white/10 bg-[#f5e4d9] transition-transform group-hover:scale-105">
-                     <img src="https://ui-avatars.com/api/?name=Vikas&background=f5e4d9&color=963e1b&bold=true" alt="Admin" className="h-full w-full object-cover" />
+                <div aria-label="Admin profile" className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-[#e8783c] font-bold text-white transition-transform group-hover:scale-105">
+                  A
                 </div>
                 <button type="button" onClick={() => void signOut()} disabled={isLoggingOut} aria-label="Sign out" title="Sign out" className="rounded-lg p-2.5 text-[#aab7b2] transition hover:bg-white/10 hover:text-white disabled:opacity-50"><LogOut size={18} /></button>
               </div>

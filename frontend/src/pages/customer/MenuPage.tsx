@@ -55,7 +55,7 @@ function App() {
   });
   const heroImage = client?.heroImage
     || menuItems.find((item) => item.img)?.img
-    || 'https://images.unsplash.com/photo-1547592180-85f173990554?w=1600&q=85';
+    || '';
 
   if (isLoading || loadError || !client) {
     return (
@@ -86,17 +86,16 @@ function App() {
           transition={{ duration: 0.65, ease: 'easeOut' }}
         >
           <div className="menu-hero-text">
-            <div className="menu-hero-badge">🔥 {client?.category?.replace(/s$/, '') ?? 'HOT & DELICIOUS'}</div>
-            <h1>{client?.businessName ?? 'Sharma Dhaba'}</h1>
-            <p>{client?.city ? `Made with love in ${client.city}` : 'Satisfy your cravings with our best dishes!'}</p>
+            <div className="menu-hero-badge">{client.category.replace(/s$/, '')}</div>
+            <h1>{client.businessName}</h1>
+            {client.city && <p>{`Made with love in ${client.city}`}</p>}
             <div className="menu-hero-stats">
               <span className="menu-hero-stat">🍽️ {menuItems.length} Dishes</span>
-              <span className="menu-hero-stat">⭐ 4.9 Rated</span>
             </div>
           </div>
           <div className="menu-hero-visual">
             <div className="menu-hero-visual-bg"></div>
-            <img className="menu-hero-image-new" src={heroImage} alt="Featured dish" />
+            {heroImage ? <img className="menu-hero-image-new" src={heroImage} alt="Featured dish" /> : <div className="menu-hero-image-placeholder" aria-hidden="true"><ChefHat size={54} strokeWidth={1.4} /></div>}
           </div>
         </motion.section>
 
@@ -166,9 +165,6 @@ function App() {
                   style={{ '--dish-bg': itemColor } as React.CSSProperties}
                 >
                   <div className="menu-dish-info">
-                    <div className="menu-dish-rating">
-                      ★ 4.8
-                    </div>
                     <h3 className="menu-dish-title">{item.name}</h3>
                     {item.description && <p className="menu-dish-description" title={item.description}>{item.description}</p>}
                     
@@ -189,12 +185,12 @@ function App() {
                   </div>
                   <div className="menu-dish-image-container">
                     <div className="menu-dish-image-wrap">
-                      <img
-                        src={item.img || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&q=80'}
+                      {item.img ? <img
+                        src={item.img}
                         alt={item.name}
                         className="menu-dish-image"
                         loading="lazy"
-                      />
+                      /> : <div className="menu-dish-image-placeholder" aria-label={`${item.name} has no image`}><UtensilsCrossed size={28} aria-hidden="true" /></div>}
                     </div>
                   </div>
                 </motion.div>
@@ -209,7 +205,7 @@ function App() {
             </motion.div>
           )}
         </section>
-        <footer className="menu-footer">Prepared with care at <strong>{client?.businessName ?? 'Sharma Dhaba'}</strong></footer>
+        <footer className="menu-footer">Prepared with care at <strong>{client.businessName}</strong></footer>
       </main>
     </div>
   );

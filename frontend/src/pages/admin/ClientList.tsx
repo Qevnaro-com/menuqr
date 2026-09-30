@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion, type Variants } from 'framer-motion';
-import { Search, MapPin, QrCode, Star, ShieldCheck, Edit3, Trash2 } from 'lucide-react';
+import { Search, MapPin, QrCode, ShieldCheck, Edit3, Trash2 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { deleteClient, getClients, type ClientCategory, type ClientRecord } from './clientStore';
 
@@ -37,8 +37,7 @@ export default function ClientList() {
     menus: client.menuItems.length,
     status: client.status,
     plan: client.plan,
-    rating: 'New',
-    img: client.heroImage || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=500&q=80',
+    img: client.heroImage,
   }));
 
   async function handleDelete(client: (typeof clients)[number]) {
@@ -89,21 +88,17 @@ export default function ClientList() {
             className="group relative rounded-[2rem] bg-white/[0.02] border border-white/[0.05] hover:border-white/[0.15] backdrop-blur-xl overflow-hidden transition-all duration-500 hover:shadow-[0_20px_40px_rgba(0,0,0,0.5)] hover:-translate-y-2"
           >
             {/* Image Header with intense gradient overlay */}
-            <div className="h-56 w-full relative overflow-hidden">
-               <img 
-                 src={client.img} 
-                 alt={client.name} 
-                 className="w-full h-full object-cover group-hover:scale-110 group-hover:rotate-1 transition-transform duration-700 ease-out"
-               />
+            <div className="relative h-56 w-full overflow-hidden bg-[#17211e]">
+              {client.img ? <img 
+                src={client.img}
+                alt={client.name}
+                className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-110 group-hover:rotate-1"
+              /> : <div aria-label={`${client.name} has no cover image`} className="grid h-full place-items-center text-5xl font-black text-white/50">{client.name.charAt(0).toUpperCase()}</div>}
                <div className="absolute inset-0 bg-gradient-to-t from-[#050508] via-[#050508]/40 to-transparent opacity-90" />
-               <div className="absolute top-4 left-4 right-4 flex justify-between items-start">
+              <div className="absolute left-4 top-4">
                   <span className="bg-white/10 backdrop-blur-md border border-white/20 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-lg">
                     {client.plan} Plan
                   </span>
-                  <div className="flex items-center gap-1 text-yellow-400 bg-black/40 backdrop-blur-md border border-white/10 px-2.5 py-1.5 rounded-xl">
-                     <Star size={14} fill="currentColor" />
-                     <span className="text-xs font-bold text-white">{client.rating}</span>
-                  </div>
                </div>
                <div className="absolute bottom-0 left-0 w-full p-5 translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
                   <h3 className="text-2xl font-black text-white tracking-wide drop-shadow-md">{client.name}</h3>
@@ -132,16 +127,10 @@ export default function ClientList() {
 
               {/* Actions */}
               <div className="flex items-center gap-3">
-                   {typeof client.id === 'string' ? <Link to={`/admin/clients/${client.id}/business`} className="flex-1 bg-white text-black font-black py-3 rounded-xl hover:bg-orange-500 hover:text-white transition-all flex items-center justify-center gap-2"><Edit3 size={18} /> Edit client</Link> : <button className="flex-1 bg-white text-black font-black py-3 rounded-xl hover:bg-orange-500 hover:text-white transition-all flex items-center justify-center gap-2"><Edit3 size={18} /> Manage</button>}
-                 {typeof client.id === 'string' ? (
-                   <Link to={`/admin/qr?clientId=${encodeURIComponent(client.id)}`} className="w-12 h-12 flex items-center justify-center rounded-xl bg-white/[0.05] border border-white/10 text-white hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_0_15px_rgba(249,115,22,0.4)] transition-all" aria-label={`Show QR for ${client.name}`} title="Show menu QR">
-                     <QrCode size={20} />
-                   </Link>
-                 ) : (
-                   <button type="button" disabled className="w-12 h-12 flex items-center justify-center rounded-xl bg-white/[0.03] border border-white/[0.06] text-white/35" aria-label={`QR unavailable for sample ${client.name}`} title="QR is available for saved menus">
-                     <QrCode size={20} />
-                   </button>
-                 )}
+                <Link to={`/admin/clients/${client.id}/business`} className="flex-1 bg-white text-black font-black py-3 rounded-xl hover:bg-orange-500 hover:text-white transition-all flex items-center justify-center gap-2"><Edit3 size={18} /> Edit client</Link>
+                <Link to={`/admin/qr?clientId=${encodeURIComponent(client.id)}`} className="w-12 h-12 flex items-center justify-center rounded-xl bg-white/[0.05] border border-white/10 text-white hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_0_15px_rgba(249,115,22,0.4)] transition-all" aria-label={`Show QR for ${client.name}`} title="Show menu QR">
+                  <QrCode size={20} />
+                </Link>
                 <button type="button" onClick={() => handleDelete(client)} className="w-12 h-12 flex items-center justify-center rounded-xl bg-rose-500/10 border border-rose-400/20 text-rose-300 transition-all hover:bg-rose-500 hover:text-white" aria-label={`Delete ${client.name}`} title="Delete client">
                   <Trash2 size={18} />
                 </button>

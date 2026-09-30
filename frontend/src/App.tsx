@@ -87,8 +87,7 @@ function AppRoutes() {
           <Route path="settings" element={<Settings />} />
         </Route>
 
-        {/* Fallback to a demo menu for now */}
-        <Route path="*" element={<Navigate to="/menu/sharma-dhaba" replace />} />
+        <Route path="*" element={<Navigate to="/admin/login" replace />} />
       </Routes>
       {isLoading && (
         <div className="app-loader" role="status" aria-live="polite" aria-label={`Loading ${loaderName}`}>

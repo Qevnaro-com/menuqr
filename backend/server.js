@@ -302,6 +302,7 @@ const server = createServer(async (request, response) => {
 });
 
 await initializeStore();
-server.listen(port, '127.0.0.1', () => {
-  console.log(`MenuQR API listening at http://127.0.0.1:${port}`);
+const PORT = process.env.PORT || port || 3001;
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`MenuQR API listening on port ${PORT}`);
 });

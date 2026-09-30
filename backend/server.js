@@ -44,11 +44,10 @@ function sendJson(response, status, value, headers = {}) {
 }
 
 function getSessionToken(request) {
-  const sessionCookie = request.headers.cookie
-    ?.split(';')
-    .map((entry) => entry.trim())
-    .find((entry) => entry.startsWith('menuqr_admin_session='));
-  return sessionCookie?.slice('menuqr_admin_session='.length);
+  const authorization = request.headers.authorization;
+  return authorization?.startsWith('Bearer ')
+    ? authorization.slice('Bearer '.length)
+    : undefined;
 }
 
 async function hasAdminSession(request) {
@@ -230,10 +229,9 @@ const server = createServer(async (request, response) => {
 
   if (requestOrigin && isAllowedOrigin) {
     response.setHeader('Access-Control-Allow-Origin', requestOrigin);
-    response.setHeader('Access-Control-Allow-Credentials', 'true');
     response.setHeader(
       'Access-Control-Allow-Headers',
-      'Content-Type, Authorization, Cookie'
+      'Content-Type, Authorization'
     );
     response.setHeader(
       'Access-Control-Allow-Methods',
@@ -292,18 +290,10 @@ const server = createServer(async (request, response) => {
       const expiresAt = new Date(now + sessionDurationSeconds * 1000);
       await adminSessions.insertOne({ token, expiresAt });
 
-      const isSecure = process.env.NODE_ENV === 'production' || !!requestOrigin;
-      const cookieOptions = isSecure
-        ? '; Secure; SameSite=None'
-        : '; SameSite=Lax';
-
       sendJson(
         response,
         200,
-        { authenticated: true },
-        {
-          'Set-Cookie': `menuqr_admin_session=\({token}; HttpOnly; Path=/; Max-Age=\){sessionDurationSeconds}${cookieOptions}`,
-        }
+        { authenticated: true, token }
       );
       return;
     }
@@ -311,19 +301,7 @@ const server = createServer(async (request, response) => {
     if (request.method === 'POST' && url.pathname === '/api/auth/logout') {
       const token = getSessionToken(request);
       if (token) await adminSessions.deleteOne({ token });
-      const isSecure = process.env.NODE_ENV === 'production' || !!requestOrigin;
-      const cookieOptions = isSecure
-        ? '; Secure; SameSite=None'
-        : '; SameSite=Lax';
-
-      sendJson(
-        response,
-        200,
-        { authenticated: false },
-        {
-          'Set-Cookie': `menuqr_admin_session=; HttpOnly; Path=/; Max-Age=0${cookieOptions}`,
-        }
-      );
+      sendJson(response, 200, { authenticated: false });
       return;
     }
 

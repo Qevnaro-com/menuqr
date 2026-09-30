@@ -70,16 +70,22 @@ export interface AdminSession {
 const storageKey = 'menuqr.clients';
 const draftStorageKey = 'menuqr.clientDrafts';
 const migrationStorageKey = 'menuqr.apiMigration.v1';
+const adminTokenKey = 'menuqr.adminToken';
 
 type ClientDraft = Omit<ClientRecord, 'id' | 'createdAt'>;
 let migrationPromise: Promise<void> | undefined;
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? '';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = localStorage.getItem(adminTokenKey);
   const response = await fetch(`${apiBaseUrl}/api${path}`, {
     ...init,
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
+    credentials: 'omit',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...init?.headers,
+    },
   });
   if (!response.ok) {
     if (response.status === 401 && path.startsWith('/admin/')) {
@@ -139,12 +145,21 @@ export function getAdminSession(): Promise<AdminSession> {
   return request<AdminSession>('/auth/session');
 }
 
-export function loginAdmin(password: string): Promise<AdminSession> {
-  return request<AdminSession>('/auth/login', { method: 'POST', body: JSON.stringify({ password }) });
+export async function loginAdmin(password: string): Promise<AdminSession> {
+  const session = await request<AdminSession & { token: string }>('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ password }),
+  });
+  localStorage.setItem(adminTokenKey, session.token);
+  return { authenticated: session.authenticated };
 }
 
-export function logoutAdmin(): Promise<AdminSession> {
-  return request<AdminSession>('/auth/logout', { method: 'POST', body: '{}' });
+export async function logoutAdmin(): Promise<AdminSession> {
+  try {
+    return await request<AdminSession>('/auth/logout', { method: 'POST', body: '{}' });
+  } finally {
+    localStorage.removeItem(adminTokenKey);
+  }
 }
 
 export async function getClient(id: string): Promise<ClientRecord | undefined> {

@@ -2,24 +2,42 @@ import { useEffect, useState } from 'react';
 import { Check, Copy, Download, ExternalLink, QrCode, Store } from 'lucide-react';
 import QRCode from 'qrcode';
 import { Link, useSearchParams } from 'react-router-dom';
-import { getClients } from './clientStore';
+import { getClients, type ClientRecord } from './clientStore';
 
 export default function QrGenerator() {
-  const clients = getClients().filter((client) => client.status.toLowerCase() === 'active' && client.menuSlug);
+  const [clients, setClients] = useState<ClientRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [searchParams] = useSearchParams();
   const requestedClientId = searchParams.get('clientId');
-  const [selectedId, setSelectedId] = useState(() => clients.find((client) => client.id === requestedClientId)?.id ?? clients[0]?.id ?? '');
+  const [selectedId, setSelectedId] = useState('');
   const [qrResult, setQrResult] = useState<{ url: string; image: string } | null>(null);
   const [qrError, setQrError] = useState<{ url: string; message: string } | null>(null);
   const [copyError, setCopyError] = useState('');
   const [copiedUrl, setCopiedUrl] = useState('');
-  const selectedClient = clients.find((client) => client.id === selectedId);
+  const activeClients = clients.filter((client) => client.status.toLowerCase() === 'active' && client.menuSlug);
+  const selectedClient = activeClients.find((client) => client.id === selectedId);
   const menuUrl = selectedClient
     ? new URL(`/menu/${encodeURIComponent(selectedClient.menuSlug)}`, window.location.origin).toString()
     : '';
   const qrImage = qrResult?.url === menuUrl ? qrResult.image : '';
   const error = (qrError?.url === menuUrl ? qrError.message : '') || copyError;
   const copied = copiedUrl === menuUrl;
+
+  useEffect(() => {
+    let isCurrent = true;
+    void getClients().then((records) => {
+      if (!isCurrent) return;
+      const availableClients = records.filter((client) => client.status.toLowerCase() === 'active' && client.menuSlug);
+      setClients(records);
+      setSelectedId(availableClients.find((client) => client.id === requestedClientId)?.id ?? availableClients[0]?.id ?? '');
+    }).catch((error: unknown) => {
+      if (isCurrent) setLoadError(error instanceof Error ? error.message : 'Could not load menus.');
+    }).finally(() => {
+      if (isCurrent) setIsLoading(false);
+    });
+    return () => { isCurrent = false; };
+  }, [requestedClientId]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -57,7 +75,7 @@ export default function QrGenerator() {
         <p className="mt-2 text-sm text-[#aab7b2]">Create a scannable QR code for any saved restaurant, dhaba, or cafe menu.</p>
       </header>
 
-      {clients.length === 0 ? (
+      {isLoading ? <p className="text-sm text-[#94a39d]">Loading menus…</p> : loadError ? <p role="alert" className="text-sm text-rose-300">{loadError}</p> : activeClients.length === 0 ? (
         <section className="admin-panel flex min-h-72 flex-col items-center justify-center rounded-2xl border p-8 text-center">
           <span className="mb-4 rounded-xl bg-[#e8783c]/10 p-3 text-[#f29a66]"><Store size={24} /></span>
           <h2 className="font-bold text-white">No active menus yet</h2>

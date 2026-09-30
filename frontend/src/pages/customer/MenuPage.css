@@ -186,6 +186,46 @@
   text-align: center;
 }
 
+.menu-business-details {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
+  padding: 18px 4px;
+  border-bottom: 1px solid var(--menu-line);
+  color: var(--menu-muted);
+  font-size: 13px;
+}
+
+.menu-business-detail {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: inherit;
+  line-height: 1.5;
+  text-decoration: none;
+}
+
+.menu-business-detail svg {
+  flex: 0 0 auto;
+  color: var(--menu-accent);
+}
+
+.menu-business-services {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.menu-business-services span {
+  padding: 5px 9px;
+  border: 1px solid var(--menu-line);
+  border-radius: 999px;
+  color: var(--menu-ink);
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .menu-section-heading {
   display: flex;
   flex-direction: column;
@@ -377,7 +417,7 @@
   white-space: nowrap;
 }
 
-.menu-dish-content > .menu-dish-price-btn {
+.menu-dish-info > .menu-dish-price-btn {
   margin-top: auto;
   align-self: flex-start;
 }

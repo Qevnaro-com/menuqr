@@ -44,12 +44,54 @@ export interface ClientRecord {
   createdAt: string;
 }
 
+export interface PublicMenuRecord {
+  businessName: string;
+  category: ClientCategory;
+  address: string;
+  city: string;
+  state: string;
+  website: string;
+  openingHours: string;
+  services: string[];
+  heroImage?: string;
+  menuItems: MenuItemRecord[];
+}
+
+export interface ApiHealth {
+  status: 'ok';
+  storage: string;
+  clients: number;
+}
+
+export interface AdminSession {
+  authenticated: boolean;
+}
+
 const storageKey = 'menuqr.clients';
 const draftStorageKey = 'menuqr.clientDrafts';
+const migrationStorageKey = 'menuqr.apiMigration.v1';
 
 type ClientDraft = Omit<ClientRecord, 'id' | 'createdAt'>;
+let migrationPromise: Promise<void> | undefined;
 
-export function getClients(): ClientRecord[] {
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`/api${path}`, {
+    ...init,
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', ...init?.headers },
+  });
+  if (!response.ok) {
+    if (response.status === 401 && path.startsWith('/admin/')) {
+      window.dispatchEvent(new Event('menuqr:admin-unauthorized'));
+    }
+    const result = await response.json().catch(() => null) as { error?: string } | null;
+    throw new Error(result?.error ?? `Request failed (${response.status}).`);
+  }
+  if (response.status === 204) return undefined as T;
+  return response.json() as Promise<T>;
+}
+
+function getLegacyClients(): ClientRecord[] {
   try {
     const stored = localStorage.getItem(storageKey);
     return stored ? (JSON.parse(stored) as ClientRecord[]) : [];
@@ -58,24 +100,84 @@ export function getClients(): ClientRecord[] {
   }
 }
 
-export function getClient(id: string): ClientRecord | undefined {
-  return getClients().find((client) => client.id === id);
+async function migrateLegacyClients(clients: ClientRecord[]): Promise<ClientRecord[]> {
+  if (localStorage.getItem(migrationStorageKey)) return clients;
+  if (!migrationPromise) {
+    migrationPromise = (async () => {
+      for (const legacyClient of getLegacyClients()) {
+        if (clients.some((client) => client.menuSlug === legacyClient.menuSlug)) continue;
+        try {
+          await request<ClientRecord>('/admin/clients', {
+            method: 'POST',
+            body: JSON.stringify(legacyClient),
+          });
+        } catch (error) {
+          if (!(error instanceof Error) || !error.message.includes('already in use')) throw error;
+        }
+      }
+      localStorage.setItem(migrationStorageKey, 'done');
+    })();
+  }
+  try {
+    await migrationPromise;
+  } finally {
+    migrationPromise = undefined;
+  }
+  return request<ClientRecord[]>('/admin/clients');
 }
 
-export function getClientByMenuSlug(slug: string): ClientRecord | undefined {
-  return getClients().find((client) => client.menuSlug === slug);
+export async function getClients(): Promise<ClientRecord[]> {
+  return migrateLegacyClients(await request<ClientRecord[]>('/admin/clients'));
 }
 
-export function saveClient(client: ClientRecord): void {
-  const clients = getClients();
-  const existingIndex = clients.findIndex((item) => item.id === client.id);
-  if (existingIndex === -1) clients.unshift(client);
-  else clients[existingIndex] = client;
-  localStorage.setItem(storageKey, JSON.stringify(clients));
+export function getApiHealth(): Promise<ApiHealth> {
+  return request<ApiHealth>('/health');
 }
 
-export function deleteClient(id: string): void {
-  localStorage.setItem(storageKey, JSON.stringify(getClients().filter((client) => client.id !== id)));
+export function getAdminSession(): Promise<AdminSession> {
+  return request<AdminSession>('/auth/session');
+}
+
+export function loginAdmin(password: string): Promise<AdminSession> {
+  return request<AdminSession>('/auth/login', { method: 'POST', body: JSON.stringify({ password }) });
+}
+
+export function logoutAdmin(): Promise<AdminSession> {
+  return request<AdminSession>('/auth/logout', { method: 'POST', body: '{}' });
+}
+
+export async function getClient(id: string): Promise<ClientRecord | undefined> {
+  await getClients();
+  try {
+    return await request<ClientRecord>(`/admin/clients/${encodeURIComponent(id)}`);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Client not found.') return undefined;
+    throw error;
+  }
+}
+
+export async function getClientByMenuSlug(slug: string): Promise<PublicMenuRecord | undefined> {
+  try {
+    return await request<PublicMenuRecord>(`/public/menus/${encodeURIComponent(slug)}`);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'This menu is unavailable.') return undefined;
+    throw error;
+  }
+}
+
+export function createClient(client: Omit<ClientRecord, 'id' | 'createdAt'>): Promise<ClientRecord> {
+  return request<ClientRecord>('/admin/clients', { method: 'POST', body: JSON.stringify(client) });
+}
+
+export function saveClient(client: ClientRecord): Promise<ClientRecord> {
+  return request<ClientRecord>(`/admin/clients/${encodeURIComponent(client.id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(client),
+  });
+}
+
+export async function deleteClient(id: string): Promise<void> {
+  await request<void>(`/admin/clients/${encodeURIComponent(id)}`, { method: 'DELETE' });
   removeClientDraft(id);
 }
 
@@ -89,13 +191,23 @@ export function getClientDraft(key: string): ClientDraft | undefined {
 }
 
 export function saveClientDraft(key: string, draft: ClientDraft): void {
-  const drafts = JSON.parse(localStorage.getItem(draftStorageKey) ?? '{}') as Record<string, ClientDraft>;
+  let drafts: Record<string, ClientDraft> = {};
+  try {
+    drafts = JSON.parse(localStorage.getItem(draftStorageKey) ?? '{}') as Record<string, ClientDraft>;
+  } catch {
+    drafts = {};
+  }
   drafts[key] = draft;
   localStorage.setItem(draftStorageKey, JSON.stringify(drafts));
 }
 
 export function removeClientDraft(key: string): void {
-  const drafts = JSON.parse(localStorage.getItem(draftStorageKey) ?? '{}') as Record<string, ClientDraft>;
+  let drafts: Record<string, ClientDraft> = {};
+  try {
+    drafts = JSON.parse(localStorage.getItem(draftStorageKey) ?? '{}') as Record<string, ClientDraft>;
+  } catch {
+    drafts = {};
+  }
   delete drafts[key];
   localStorage.setItem(draftStorageKey, JSON.stringify(drafts));
 }

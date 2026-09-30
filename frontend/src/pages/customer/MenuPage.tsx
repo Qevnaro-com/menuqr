@@ -1,22 +1,37 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, MapPin, ChefHat, UtensilsCrossed } from 'lucide-react';
+import { Search, MapPin, ChefHat, UtensilsCrossed, Clock3, Globe2 } from 'lucide-react';
 import { useParams } from 'react-router-dom';
-import { getClientByMenuSlug } from '../admin/clientStore';
+import { getClientByMenuSlug, type PublicMenuRecord } from '../admin/clientStore';
 import './MenuPage.css';
-
-const demoMenuItems = [
-  { id: 'demo-1', name: 'Paneer Tikka', description: 'Smoky paneer with house spices.', price: '₹250', category: 'Starters', type: 'veg', img: 'https://images.unsplash.com/photo-1567158763566-50794ce8b9a1?w=500&q=80' },
-  { id: 'demo-2', name: 'Chicken Biryani', description: 'Slow-cooked basmati rice with aromatic spices.', price: '₹350', category: 'Main Course', type: 'non-veg', img: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=500&q=80' },
-  { id: 'demo-3', name: 'Tandoori Roti', description: 'Freshly baked in the clay oven.', price: '₹30', category: 'Main Course', type: 'veg', img: 'https://images.unsplash.com/photo-1626200419188-3caeb0064a78?w=500&q=80' },
-  { id: 'demo-4', name: 'Mojito', description: 'Mint, lime, and sparkling soda.', price: '₹150', category: 'Drinks', type: 'veg', img: 'https://images.unsplash.com/photo-1551538827-9c037cb4f32a?w=500&q=80' },
-];
 
 function App() {
   const { slug } = useParams();
-  const client = slug ? getClientByMenuSlug(slug) : undefined;
-  const menuItems = client
-    ? (client.menuItems ?? []).filter((item) => item.available).map((item) => ({
+  const [menuResult, setMenuResult] = useState<{ slug: string; client?: PublicMenuRecord; error?: string }>();
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
+  const currentMenuResult = menuResult?.slug === slug ? menuResult : undefined;
+  const client = currentMenuResult?.client;
+  const loadError = currentMenuResult?.error ?? '';
+  const isLoading = Boolean(slug) && !currentMenuResult;
+
+  useEffect(() => {
+    let isCurrent = true;
+    if (!slug) {
+      return;
+    }
+    void getClientByMenuSlug(slug).then((menu) => {
+      if (!isCurrent) return;
+      setMenuResult(menu
+        ? { slug, client: menu }
+        : { slug, error: 'This menu is unavailable. Check the link or contact the restaurant.' });
+    }).catch((error: unknown) => {
+      if (isCurrent) setMenuResult({ slug, error: error instanceof Error ? error.message : 'Could not load this menu.' });
+    });
+    return () => { isCurrent = false; };
+  }, [slug]);
+
+  const menuItems = (client?.menuItems ?? []).map((item) => ({
       id: item.id,
       name: item.name,
       description: item.description,
@@ -30,11 +45,8 @@ function App() {
       category: item.category,
       type: item.dietType,
       img: item.image,
-    }))
-    : demoMenuItems.map(item => ({ ...item, pricingType: 'single', halfPrice: '', fullPrice: '', regPrice: '', medPrice: '', largePrice: '' }));
+    }));
   const categories = ['All', ...new Set(menuItems.map((item) => item.category))];
-  const [activeCategory, setActiveCategory] = useState('All');
-  const [searchQuery, setSearchQuery] = useState('');
 
   const filteredItems = menuItems.filter((item) => {
     const categoryMatch = activeCategory === 'All' ? true : item.category === activeCategory;
@@ -44,6 +56,15 @@ function App() {
   const heroImage = client?.heroImage
     || menuItems.find((item) => item.img)?.img
     || 'https://images.unsplash.com/photo-1547592180-85f173990554?w=1600&q=85';
+
+  if (isLoading || loadError || !client) {
+    return (
+      <div className="customer-menu">
+        <header className="menu-topbar"><a className="menu-wordmark" href="#top" aria-label="MenuQR menu"><span className="menu-brand-icon"><ChefHat size={19} strokeWidth={2} /></span><span>Menu<span className="menu-brand-accent">QR</span></span></a></header>
+        <main id="top" className="menu-main"><div className="menu-empty-state" role={loadError ? 'alert' : 'status'}>{loadError || 'Preparing this menu…'}</div></main>
+      </div>
+    );
+  }
 
   return (
     <div className="customer-menu">
@@ -78,6 +99,15 @@ function App() {
             <img className="menu-hero-image-new" src={heroImage} alt="Featured dish" />
           </div>
         </motion.section>
+
+        {(client.address || client.openingHours || client.services.length > 0 || client.website) && (
+          <section className="menu-business-details" aria-label="Business details">
+            {(client.address || client.city || client.state) && <div className="menu-business-detail"><MapPin size={16} aria-hidden="true" /><span>{[client.address, client.city, client.state].filter(Boolean).join(', ')}</span></div>}
+            {client.openingHours && <div className="menu-business-detail"><Clock3 size={16} aria-hidden="true" /><span>{client.openingHours}</span></div>}
+            {client.services.length > 0 && <div className="menu-business-services">{client.services.map((service) => <span key={service}>{service}</span>)}</div>}
+            {client.website && <a className="menu-business-detail" href={client.website} target="_blank" rel="noreferrer"><Globe2 size={16} aria-hidden="true" /><span>Website</span></a>}
+          </section>
+        )}
 
         <section className="menu-controls" aria-label="Find dishes">
           <div className="menu-section-heading">

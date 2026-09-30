@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, Utensils, Store, Coffee, QrCode, Settings, Menu, X, ChefHat, Sparkles, Bell, ClipboardPlus } from 'lucide-react';
+import { LayoutDashboard, Utensils, Store, Coffee, QrCode, Settings, Menu, X, ChefHat, Sparkles, Bell, ClipboardPlus, LogOut } from 'lucide-react';
+import { logoutAdmin } from '../pages/admin/clientStore';
 import '../App.css';
 
 const navItems = [
@@ -16,12 +17,28 @@ const navItems = [
 
 export default function AdminLayout() {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const [logoutError, setLogoutError] = useState('');
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const pageTitle = location.pathname.startsWith('/admin/clients')
     ? 'Onboard'
     : navItems.find((item) => item.path === location.pathname)?.label ?? 'Admin Console';
 
   const toggleSidebar = () => setSidebarOpen(!isSidebarOpen);
+
+  async function signOut() {
+    setIsLoggingOut(true);
+    setLogoutError('');
+    try {
+      await logoutAdmin();
+      navigate('/admin/login', { replace: true });
+    } catch (error) {
+      setLogoutError(error instanceof Error ? error.message : 'Could not sign out.');
+    } finally {
+      setIsLoggingOut(false);
+    }
+  }
 
   return (
     <div className="admin-shell relative flex h-dvh overflow-hidden bg-[#151c19] font-sans text-[#e7ece9] selection:bg-orange-500/25">
@@ -131,9 +148,11 @@ export default function AdminLayout() {
                 <div className="h-10 w-10 overflow-hidden rounded-xl border border-white/10 bg-[#f5e4d9] transition-transform group-hover:scale-105">
                      <img src="https://ui-avatars.com/api/?name=Vikas&background=f5e4d9&color=963e1b&bold=true" alt="Admin" className="h-full w-full object-cover" />
                 </div>
+                <button type="button" onClick={() => void signOut()} disabled={isLoggingOut} aria-label="Sign out" title="Sign out" className="rounded-lg p-2.5 text-[#aab7b2] transition hover:bg-white/10 hover:text-white disabled:opacity-50"><LogOut size={18} /></button>
               </div>
             </div>
           </div>
+          {logoutError && <p role="alert" className="px-4 pb-2 text-right text-xs text-rose-300 sm:px-6 lg:px-9">{logoutError}</p>}
         </header>
 
         {/* Scrollable Content */}

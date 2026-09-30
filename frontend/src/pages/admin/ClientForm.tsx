@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Building2, Check, Clock3, CreditCard, MapPin, Save, UserRound, ImagePlus } from 'lucide-react';
-import { getClient, getClientDraft, removeClientDraft, saveClient, saveClientDraft, type ClientCategory, type ClientRecord } from './clientStore';
+import { createClient, getClient, getClientDraft, removeClientDraft, saveClient, saveClientDraft, type ClientCategory, type ClientRecord } from './clientStore';
 import MenuItemsEditor, { compressImage } from './MenuItemsEditor';
 
 const categories: { value: ClientCategory; label: string }[] = [
@@ -33,6 +33,10 @@ function slugify(value: string) {
   return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
 
+function getStepPath(clientId: string | undefined, index: number) {
+  return `/admin/clients/${clientId ?? 'new'}/${steps[index].slug}`;
+}
+
 function Field({ label, children, className = '' }: { label: string; children: ReactNode; className?: string }) {
   return <label className={`block ${className}`}><span className={labelClass}>{label}</span>{children}</label>;
 }
@@ -40,32 +44,52 @@ function Field({ label, children, className = '' }: { label: string; children: R
 export default function ClientForm() {
   const { clientId, step: stepSlug } = useParams();
   const navigate = useNavigate();
-  const existing = clientId ? getClient(clientId) : undefined;
+  const [existing, setExisting] = useState<ClientRecord>();
+  const [loadedClientId, setLoadedClientId] = useState<string>();
+  const [loadFailure, setLoadFailure] = useState<{ id: string; message: string }>();
+  const activeExisting = existing?.id === clientId ? existing : undefined;
+  const isLoadingClient = Boolean(clientId) && loadedClientId !== clientId;
+  const loadError = loadFailure && loadFailure.id === clientId ? loadFailure.message : '';
+  const [saveError, setSaveError] = useState('');
   const [form, setForm] = useState<Omit<ClientRecord, 'id' | 'createdAt'>>(() => {
     const draft = getClientDraft(clientId ?? 'new');
     if (draft) return { ...emptyClient, ...draft, menuItems: draft.menuItems ?? [] };
-    if (existing) return {
-      businessName: existing.businessName, category: existing.category, ownerName: existing.ownerName,
-      email: existing.email, phone: existing.phone, website: existing.website, address: existing.address,
-      city: existing.city, state: existing.state, postalCode: existing.postalCode, country: existing.country,
-      menuSlug: existing.menuSlug, plan: existing.plan, billingCycle: existing.billingCycle,
-      monthlyPrice: existing.monthlyPrice, openingHours: existing.openingHours, services: existing.services,
-      menuItems: existing.menuItems ?? [], heroImage: existing.heroImage || '', status: existing.status, notes: existing.notes,
-    };
     return emptyClient;
   });
-  const [slugEdited, setSlugEdited] = useState(Boolean(existing));
+  const [slugEdited, setSlugEdited] = useState(Boolean(clientId));
   const step = Math.max(0, steps.findIndex((item) => item.slug === stepSlug));
-  const stepPath = (index: number) => `/admin/clients/${clientId ?? 'new'}/${steps[index].slug}`;
 
   useEffect(() => {
-    if (clientId && !existing) navigate('/admin/restaurants', { replace: true });
-    else if (stepSlug !== steps[step].slug) navigate(stepPath(0), { replace: true });
-  }, [clientId, existing, navigate, step, stepSlug]);
+    let isCurrent = true;
+    if (!clientId) return () => { isCurrent = false; };
+    void getClient(clientId).then((client) => {
+      if (!isCurrent) return;
+      if (!client) {
+        navigate('/admin/restaurants', { replace: true });
+        return;
+      }
+      setExisting(client);
+      const recordDraft: Partial<ClientRecord> = { ...client };
+      delete recordDraft.id;
+      delete recordDraft.createdAt;
+      setForm({ ...emptyClient, ...recordDraft, ...getClientDraft(clientId) });
+      setSlugEdited(true);
+    }).catch((error: unknown) => {
+      if (isCurrent) setLoadFailure({ id: clientId, message: error instanceof Error ? error.message : 'Could not load this client.' });
+    }).finally(() => {
+      if (isCurrent) setLoadedClientId(clientId);
+    });
+    return () => { isCurrent = false; };
+  }, [clientId, navigate]);
 
   useEffect(() => {
-    saveClientDraft(clientId ?? 'new', form);
-  }, [clientId, form]);
+    if (clientId && !activeExisting && !isLoadingClient && !loadError) navigate('/admin/restaurants', { replace: true });
+    else if (stepSlug !== steps[step].slug) navigate(getStepPath(clientId, 0), { replace: true });
+  }, [activeExisting, clientId, isLoadingClient, loadError, navigate, step, stepSlug]);
+
+  useEffect(() => {
+    if (!isLoadingClient && (!clientId || activeExisting)) saveClientDraft(clientId ?? 'new', form);
+  }, [activeExisting, clientId, form, isLoadingClient]);
 
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -81,16 +105,21 @@ export default function ClientForm() {
     }
   }
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (step < steps.length - 1) {
-      if (event.currentTarget.reportValidity()) navigate(stepPath(step + 1));
+      if (event.currentTarget.reportValidity()) navigate(getStepPath(clientId, step + 1));
       return;
     }
-    const now = new Date().toISOString();
-    saveClient({ ...form, id: existing?.id ?? crypto.randomUUID(), createdAt: existing?.createdAt ?? now });
-    removeClientDraft(clientId ?? 'new');
-    navigate(`/admin/${form.category}`, { state: { clientSaved: form.businessName } });
+    setSaveError('');
+    try {
+      if (activeExisting) await saveClient({ ...form, id: activeExisting.id, createdAt: activeExisting.createdAt });
+      else await createClient(form);
+      removeClientDraft(clientId ?? 'new');
+      navigate(`/admin/${form.category}`, { state: { clientSaved: form.businessName } });
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Could not save this client.');
+    }
   }
 
   return (
@@ -98,15 +127,16 @@ export default function ClientForm() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <Link to="/admin/dashboard" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-[#aab7b2] transition hover:text-white"><ArrowLeft size={16} /> Overview</Link>
-          <h1 className="text-3xl font-black tracking-tight text-white">{existing ? 'Edit client' : 'Onboard a client'}</h1>
+          <h1 className="text-3xl font-black tracking-tight text-white">{activeExisting ? 'Edit client' : 'Onboard a client'}</h1>
           <p className="mt-2 text-sm text-[#aab7b2]">Set up a client in five quick steps.</p>
+          {(loadError || saveError) && <p role="alert" className="mt-2 text-sm text-rose-300">{loadError || saveError}</p>}
         </div>
         <div className="hidden items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/5 px-3 py-2 text-xs font-semibold text-emerald-300 sm:flex"><span className="h-2 w-2 rounded-full bg-emerald-400" /> Draft saves as you go</div>
       </div>
 
       <nav aria-label="Onboarding steps" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {steps.map((item, index) => (
-          <button key={item.title} type="button" onClick={() => index < step && navigate(stepPath(index))} className={`flex items-center gap-3 rounded-xl border px-3 py-3 text-left transition ${index === step ? 'border-[#e8783c]/50 bg-[#e8783c]/10' : index < step ? 'border-emerald-400/20 bg-emerald-400/[0.04]' : 'border-white/[0.07] bg-white/[0.02]'}`}>
+          <button key={item.title} type="button" onClick={() => index < step && navigate(getStepPath(clientId, index))} className={`flex items-center gap-3 rounded-xl border px-3 py-3 text-left transition ${index === step ? 'border-[#e8783c]/50 bg-[#e8783c]/10' : index < step ? 'border-emerald-400/20 bg-emerald-400/[0.04]' : 'border-white/[0.07] bg-white/[0.02]'}`}>
             <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${index === step ? 'bg-[#e8783c] text-white' : index < step ? 'bg-emerald-400/15 text-emerald-300' : 'bg-white/[0.06] text-[#8d9a94]'}`}>{index < step ? <Check size={15} /> : `0${index + 1}`}</span>
             <span className="min-w-0"><span className={`block text-sm font-bold ${index === step ? 'text-white' : 'text-[#c0cbc5]'}`}>{item.title}</span><span className="mt-0.5 hidden text-[11px] text-[#87958e] sm:block">{item.detail}</span></span>
           </button>
@@ -150,7 +180,7 @@ export default function ClientForm() {
         </section>}
 
         <div className="-mx-4 flex items-center justify-between gap-3 border-t border-white/10 px-4 py-4 sm:-mx-6 sm:px-6 lg:-mx-9 lg:px-9">
-          {step === 0 ? <Link to="/admin/dashboard" className="rounded-lg px-4 py-2.5 text-sm font-semibold text-[#aab7b2] transition hover:bg-white/5 hover:text-white">Cancel</Link> : <button type="button" onClick={() => navigate(stepPath(step - 1))} className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-[#aab7b2] transition hover:bg-white/5 hover:text-white"><ArrowLeft size={16} />Back</button>}
+          {step === 0 ? <Link to="/admin/dashboard" className="rounded-lg px-4 py-2.5 text-sm font-semibold text-[#aab7b2] transition hover:bg-white/5 hover:text-white">Cancel</Link> : <button type="button" onClick={() => navigate(getStepPath(clientId, step - 1))} className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-[#aab7b2] transition hover:bg-white/5 hover:text-white"><ArrowLeft size={16} />Back</button>}
           <button type="submit" className="inline-flex items-center gap-2 rounded-lg bg-[#e8783c] px-5 py-3 text-sm font-bold text-white shadow-lg shadow-[#e8783c]/15 transition hover:bg-[#f18b50] active:scale-[0.98]">{step === steps.length - 1 ? <><Save size={17} />{existing ? 'Save changes' : 'Create client'}</> : <>Continue<ArrowRight size={16} /></>}</button>
         </div>
       </form>

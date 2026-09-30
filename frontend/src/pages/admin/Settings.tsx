@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Building2, Check, Save, Store } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { getClients, saveClient, type ClientRecord } from './clientStore';
@@ -23,13 +23,29 @@ function toDraft(client?: ClientRecord): SettingsDraft {
 }
 
 export default function Settings() {
-  const initialClients = getClients();
-  const [clients, setClients] = useState(initialClients);
-  const [selectedId, setSelectedId] = useState(initialClients[0]?.id ?? '');
-  const [draft, setDraft] = useState(() => toDraft(initialClients[0]));
+  const [clients, setClients] = useState<ClientRecord[]>([]);
+  const [selectedId, setSelectedId] = useState('');
+  const [draft, setDraft] = useState(() => toDraft());
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const selectedClient = clients.find((client) => client.id === selectedId);
+
+  useEffect(() => {
+    let isCurrent = true;
+    void getClients().then((records) => {
+      if (!isCurrent) return;
+      setClients(records);
+      setSelectedId(records[0]?.id ?? '');
+      setDraft(toDraft(records[0]));
+    }).catch((loadError: unknown) => {
+      if (isCurrent) setError(loadError instanceof Error ? loadError.message : 'Could not load settings.');
+    }).finally(() => {
+      if (isCurrent) setIsLoading(false);
+    });
+    return () => { isCurrent = false; };
+  }, []);
 
   function selectClient(id: string) {
     const client = clients.find((entry) => entry.id === id);
@@ -44,7 +60,7 @@ export default function Settings() {
     setSaved(false);
   }
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedClient) return;
 
@@ -69,11 +85,19 @@ export default function Settings() {
     }
 
     const updatedClient = { ...selectedClient, ...draft, businessName, menuSlug, monthlyPrice };
-    saveClient(updatedClient);
-    setClients((current) => current.map((client) => client.id === selectedId ? updatedClient : client));
-    setDraft(toDraft(updatedClient));
-    setError('');
-    setSaved(true);
+    setIsSaving(true);
+    try {
+      const savedClient = await saveClient(updatedClient);
+      setClients((current) => current.map((client) => client.id === selectedId ? savedClient : client));
+      setDraft(toDraft(savedClient));
+      setError('');
+      setSaved(true);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Could not save settings.');
+      setSaved(false);
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
@@ -84,7 +108,7 @@ export default function Settings() {
         <p className="mt-2 text-sm text-[#aab7b2]">Manage a saved business profile, menu URL, status, and subscription.</p>
       </header>
 
-      {clients.length === 0 ? (
+      {isLoading ? <p className="text-sm text-[#94a39d]">Loading account settings…</p> : clients.length === 0 ? (
         <section className="admin-panel flex min-h-72 flex-col items-center justify-center rounded-2xl border p-8 text-center">
           <span className="mb-4 rounded-xl bg-[#e8783c]/10 p-3 text-[#f29a66]"><Store size={24} /></span>
           <h2 className="font-bold text-white">No businesses to manage</h2>
@@ -125,7 +149,7 @@ export default function Settings() {
 
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div aria-live="polite">{error ? <p className="text-sm text-rose-300">{error}</p> : saved ? <p className="flex items-center gap-2 text-sm font-semibold text-emerald-300"><Check size={16} />Settings saved</p> : null}</div>
-              <button type="submit" className="inline-flex items-center gap-2 rounded-lg bg-[#e8783c] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#f18b50]"><Save size={17} />Save settings</button>
+              <button type="submit" disabled={isSaving} className="inline-flex items-center gap-2 rounded-lg bg-[#e8783c] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#f18b50] disabled:cursor-wait disabled:opacity-60"><Save size={17} />{isSaving ? 'Saving…' : 'Save settings'}</button>
             </div>
           </>}
         </form>

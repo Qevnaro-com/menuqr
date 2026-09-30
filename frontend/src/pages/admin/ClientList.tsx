@@ -1,22 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, type Variants } from 'framer-motion';
 import { Search, MapPin, QrCode, Star, ShieldCheck, Edit3, Trash2 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
-import { deleteClient, getClients } from './clientStore';
-
-const dummyData = {
-  restaurants: [
-    { id: 1, name: 'The Royal Palace', location: 'Connaught Place, Delhi', menus: 124, status: 'Active', plan: 'Premium', rating: 4.8, img: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=500&q=80' },
-    { id: 2, name: 'Mainland China', location: 'Andheri West, Mumbai', menus: 86, status: 'Active', plan: 'Pro', rating: 4.5, img: 'https://images.unsplash.com/photo-1552566626-52f8b828add9?w=500&q=80' },
-  ],
-  dhabas: [
-    { id: 3, name: 'Sharma Ji Ka Dhaba', location: 'NH-44 Highway', menus: 45, status: 'Active', plan: 'Basic', rating: 4.9, img: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=500&q=80' },
-    { id: 4, name: 'Pappu Punjabi Dhaba', location: 'GT Road, Panipat', menus: 32, status: 'Active', plan: 'Basic', rating: 4.2, img: 'https://images.unsplash.com/photo-1596797038530-2c107229654b?w=500&q=80' },
-  ],
-  cafes: [
-    { id: 5, name: 'Brew Beans', location: 'Koramangala, BLR', menus: 65, status: 'Active', plan: 'Pro', rating: 4.7, img: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=500&q=80' },
-  ]
-};
+import { deleteClient, getClients, type ClientCategory, type ClientRecord } from './clientStore';
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.1 } } };
 const itemAnim: Variants = { hidden: { y: 40, opacity: 0, scale: 0.95 }, show: { y: 0, opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 300, damping: 24 } } };
@@ -24,44 +10,45 @@ const itemAnim: Variants = { hidden: { y: 40, opacity: 0, scale: 0.95 }, show: {
 export default function ClientList() {
   const location = useLocation();
   const type = location.pathname.split('/').pop() || 'restaurants';
-  const [deletedSampleIds, setDeletedSampleIds] = useState<string[]>(() => {
-    try {
-      return JSON.parse(localStorage.getItem('menuqr.deletedSampleClients') ?? '[]') as string[];
-    } catch {
-      return [];
-    }
-  });
-  const [deletedClientIds, setDeletedClientIds] = useState<string[]>([]);
-  
-  // @ts-ignore
-  const category = (['restaurants', 'dhabas', 'cafes'].includes(type) ? type : 'restaurants') as keyof typeof dummyData;
-  const clients = [
-    ...dummyData[category].filter((client) => !deletedSampleIds.includes(`${category}:${client.id}`)),
-    ...getClients().filter((client) => client.category === category && !deletedClientIds.includes(client.id)).map((client) => ({
-      id: client.id,
-      name: client.businessName,
-      location: [client.city, client.state].filter(Boolean).join(', '),
-      menus: client.menuItems?.length ?? 0,
-      status: client.status,
-      plan: client.plan,
-      rating: 'New',
-      img: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=500&q=80',
-    })),
-  ];
+  const category = (['restaurants', 'dhabas', 'cafes'].includes(type) ? type : 'restaurants') as ClientCategory;
+  const [savedClients, setSavedClients] = useState<ClientRecord[]>([]);
+  const [loadResult, setLoadResult] = useState<{ category: ClientCategory; error?: string }>();
+  const isLoading = loadResult?.category !== category;
+  const error = loadResult?.category === category ? loadResult.error ?? '' : '';
   const title = type.charAt(0).toUpperCase() + type.slice(1);
 
-  function handleDelete(client: (typeof clients)[number]) {
+  useEffect(() => {
+    let isCurrent = true;
+    void getClients().then((records) => {
+      if (isCurrent) {
+        setSavedClients(records);
+        setLoadResult({ category });
+      }
+    }).catch((loadError: unknown) => {
+      if (isCurrent) setLoadResult({ category, error: loadError instanceof Error ? loadError.message : 'Could not load clients.' });
+    });
+    return () => { isCurrent = false; };
+  }, [category]);
+
+  const clients = savedClients.filter((client) => client.category === category).map((client) => ({
+    id: client.id,
+    name: client.businessName,
+    location: [client.city, client.state].filter(Boolean).join(', '),
+    menus: client.menuItems.length,
+    status: client.status,
+    plan: client.plan,
+    rating: 'New',
+    img: client.heroImage || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=500&q=80',
+  }));
+
+  async function handleDelete(client: (typeof clients)[number]) {
     if (!window.confirm(`Delete ${client.name}? This cannot be undone.`)) return;
-    if (typeof client.id === 'string') {
-      const clientId = client.id;
-      deleteClient(clientId);
-      setDeletedClientIds((ids) => [...ids, clientId]);
-      return;
+    try {
+      await deleteClient(client.id);
+      setSavedClients((current) => current.filter((entry) => entry.id !== client.id));
+    } catch (deleteError) {
+      setLoadResult({ category, error: deleteError instanceof Error ? deleteError.message : 'Could not delete this client.' });
     }
-    const deletedId = `${category}:${client.id}`;
-    const nextDeletedIds = [...deletedSampleIds, deletedId];
-    localStorage.setItem('menuqr.deletedSampleClients', JSON.stringify(nextDeletedIds));
-    setDeletedSampleIds(nextDeletedIds);
   }
 
   return (
@@ -95,7 +82,7 @@ export default function ClientList() {
 
       {/* Grid */}
       <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-        {clients.map((client: any) => (
+        {clients.map((client) => (
           <motion.div 
             key={client.id} 
             variants={itemAnim}
@@ -138,7 +125,7 @@ export default function ClientList() {
                  <div className="bg-green-500/10 rounded-2xl p-4 border border-green-500/20">
                     <p className="text-[10px] text-green-400 font-bold uppercase tracking-widest mb-1.5">System Status</p>
                     <p className="text-lg font-black text-green-400 flex items-center gap-1.5 mt-1">
-                      <ShieldCheck size={18} /> Active
+                      <ShieldCheck size={18} /> {client.status}
                     </p>
                  </div>
               </div>
@@ -163,6 +150,9 @@ export default function ClientList() {
           </motion.div>
         ))}
       </motion.div>
+      {error && <p role="alert" className="text-sm text-rose-300">{error}</p>}
+      {!isLoading && !error && clients.length === 0 && <p className="text-sm text-slate-400">No {title.toLowerCase()} found. Onboard a client to add one.</p>}
+      {isLoading && <p className="text-sm text-slate-400">Loading {title.toLowerCase()}…</p>}
     </div>
   );
 }

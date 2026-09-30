@@ -18,6 +18,7 @@ const adminPassword = process.env.ADMIN_PASSWORD || 'MenuQR@2026!';
 const adminPasswordHash = createHash('sha256').update(adminPassword).digest();
 const sessionDurationSeconds = 8 * 60 * 60;
 const loginLockDurationMs = 60 * 1000;
+const frontendOrigin = process.env.FRONTEND_ORIGIN;
 const categories = new Set(['restaurants', 'dhabas', 'cafes']);
 const loginAttempts = new Map();
 
@@ -178,6 +179,12 @@ async function initializeStore() {
 
 const server = createServer(async (request, response) => {
   const url = new URL(request.url, 'http://localhost');
+  const requestOrigin = request.headers.origin;
+  if (requestOrigin && requestOrigin === frontendOrigin) {
+    response.setHeader('Access-Control-Allow-Origin', frontendOrigin);
+    response.setHeader('Access-Control-Allow-Credentials', 'true');
+    response.setHeader('Vary', 'Origin');
+  }
   if (request.method === 'OPTIONS') {
     response.writeHead(204, { 'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' });
     response.end();
@@ -216,9 +223,9 @@ const server = createServer(async (request, response) => {
       const token = randomUUID();
       const expiresAt = new Date(now + sessionDurationSeconds * 1000);
       await adminSessions.insertOne({ token, expiresAt });
-      const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+      const secure = process.env.NODE_ENV === 'production' ? '; Secure; SameSite=None' : '; SameSite=Strict';
       sendJson(response, 200, { authenticated: true }, {
-        'Set-Cookie': `menuqr_admin_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${sessionDurationSeconds}${secure}`,
+        'Set-Cookie': `menuqr_admin_session=${token}; HttpOnly; Path=/; Max-Age=${sessionDurationSeconds}${secure}`,
       });
       return;
     }
@@ -226,8 +233,9 @@ const server = createServer(async (request, response) => {
     if (request.method === 'POST' && url.pathname === '/api/auth/logout') {
       const token = getSessionToken(request);
       if (token) await adminSessions.deleteOne({ token });
+      const secure = process.env.NODE_ENV === 'production' ? '; Secure; SameSite=None' : '; SameSite=Strict';
       sendJson(response, 200, { authenticated: false }, {
-        'Set-Cookie': 'menuqr_admin_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0',
+        'Set-Cookie': `menuqr_admin_session=; HttpOnly; Path=/; Max-Age=0${secure}`,
       });
       return;
     }

@@ -5,6 +5,8 @@ import { Link, useParams } from 'react-router-dom';
 import { getClientByMenuSlug, type PublicMenuRecord } from '../admin/clientStore';
 import './MenuPage.css';
 
+const categoryPalette = ['#ff761a', '#ffc928', '#ff5e4d', '#34b56a', '#28a5a2', '#e56ea9', '#6785e6', '#a36be0', '#e7a52a', '#56a7dd'];
+
 function App() {
   const { slug } = useParams();
   const [menuResult, setMenuResult] = useState<{ slug: string; client?: PublicMenuRecord; error?: string }>();
@@ -47,6 +49,10 @@ function App() {
       img: item.image,
     }));
   const categories = ['All', ...new Set(menuItems.map((item) => item.category))];
+  const categoryColors = new Map(categories.slice(1).map((category, index) => [
+    category,
+    categoryPalette[index] ?? `hsl(${(index * 137.508) % 360} 80% 70%)`,
+  ]));
 
   const filteredItems = menuItems.filter((item) => {
     const categoryMatch = activeCategory === 'All' ? true : item.category === activeCategory;
@@ -149,10 +155,7 @@ function App() {
         <section className="menu-dishes" aria-label="Menu dishes">
           <AnimatePresence mode="popLayout">
             {filteredItems.map((item) => {
-              const actualCategories = categories.filter(c => c !== 'All');
-              const catIndex = actualCategories.indexOf(item.category);
-              const palette = ['#f24e61', '#ff9f1c', '#2ec4b6', '#8338ec', '#ff006e', '#3a86ff', '#fb5607', '#06d6a0'];
-              const itemColor = palette[Math.max(0, catIndex) % palette.length];
+              const itemColor = categoryColors.get(item.category) ?? '#ff761a';
 
               return (
                 <motion.div

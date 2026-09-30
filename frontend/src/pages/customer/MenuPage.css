@@ -779,3 +779,28 @@
   color: var(--menu-muted);
 }
 
+.menu-dish-title {
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
+.menu-dish-description {
+  color: rgba(255, 255, 255, 0.94);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.menu-dish-price-btn {
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 7px;
+  background: #30483a;
+  color: #fff;
+}
+
+.variant-label {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.menu-dish-image-placeholder {
+  color: #fff;
+}
+

@@ -1,37 +1,57 @@
-import nodemailer from 'nodemailer';
-import dns from 'dns';
-
-// Render ke server par IPv6 network block hota hai, 
-// isliye hum Node.js ko sirf IPv4 (normal IPs) use karne ke liye force kar rahe hain.
-dns.setDefaultResultOrder('ipv4first');
-
-let transporter;
-
-function getTransporter() {
-  if (!transporter) {
-    transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
-      auth: {
-        user: process.env.SMTP_USER?.trim(),
-        pass: process.env.SMTP_APP_PASSWORD?.trim(),
-      },
-    });
-  }
-  return transporter;
-}
+import https from 'https';
 
 async function sendEmail(message, label) {
-  try {
-    const info = await getTransporter().sendMail({
-      from: `MenuQR <${process.env.SMTP_USER?.trim()}>`,
-      ...message,
-    });
-    console.info(`[email] ${label} accepted by Gmail (id: ${info.messageId}).`);
-  } catch (error) {
-    console.error(`[email] Could not send ${label}:`, error.message);
+  if (!process.env.BREVO_API_KEY) {
+    console.error(`[email] BREVO_API_KEY is not set in Render Environment Variables; could not send ${label}.`);
+    return;
   }
+  
+  // Use the verified Gmail ID
+  const senderEmail = process.env.SMTP_USER?.trim() || 'qevnaro@gmail.com';
+
+  const payload = JSON.stringify({
+    sender: { email: senderEmail, name: 'MenuQR' },
+    to: [{ email: message.to }],
+    subject: message.subject,
+    htmlContent: message.html,
+    textContent: message.text
+  });
+
+  const options = {
+    hostname: 'api.brevo.com',
+    path: '/v3/smtp/email',
+    method: 'POST',
+    headers: {
+      'accept': 'application/json',
+      'api-key': process.env.BREVO_API_KEY.trim(),
+      'content-type': 'application/json',
+      'content-length': Buffer.byteLength(payload)
+    }
+  };
+
+  return new Promise((resolve) => {
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          console.info(`[email] ${label} accepted by Brevo.`);
+          resolve();
+        } else {
+          console.error(`[email] Could not send ${label} (status: ${res.statusCode}):`, data);
+          resolve();
+        }
+      });
+    });
+    
+    req.on('error', (e) => {
+      console.error(`[email] Request error for ${label}:`, e.message);
+      resolve();
+    });
+    
+    req.write(payload);
+    req.end();
+  });
 }
 
 export async function sendNewUserAlert(client) {

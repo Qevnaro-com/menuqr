@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, Utensils, Store, Coffee, QrCode, Settings, Menu, X, ChefHat, Sparkles, Bell, ClipboardPlus, LogOut } from 'lucide-react';
-import { getApiHealth, getNotifications, logoutAdmin, markNotificationRead, type AdminNotification } from '../pages/admin/clientStore';
+import { LayoutDashboard, Utensils, Store, Coffee, QrCode, Settings, Menu, X, ChefHat, Sparkles, Bell, ClipboardPlus, LogOut, Trash2 } from 'lucide-react';
+import { clearNotifications, getApiHealth, getNotifications, logoutAdmin, markNotificationRead, type AdminNotification } from '../pages/admin/clientStore';
 import '../App.css';
 
 const navItems = [
@@ -21,6 +21,7 @@ export default function AdminLayout() {
   const [logoutError, setLogoutError] = useState('');
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isNotificationsOpen, setNotificationsOpen] = useState(false);
+  const [isClearingNotifications, setIsClearingNotifications] = useState(false);
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
   const [notificationError, setNotificationError] = useState('');
   const location = useLocation();
@@ -78,6 +79,19 @@ export default function AdminLayout() {
       ));
     } catch (error) {
       setNotificationError(error instanceof Error ? error.message : 'Could not update notification.');
+    }
+  }
+
+  async function clearAllNotifications() {
+    setIsClearingNotifications(true);
+    setNotificationError('');
+    try {
+      await clearNotifications();
+      setNotifications([]);
+    } catch (error) {
+      setNotificationError(error instanceof Error ? error.message : 'Could not clear notifications.');
+    } finally {
+      setIsClearingNotifications(false);
     }
   }
 
@@ -195,13 +209,19 @@ export default function AdminLayout() {
                   {notifications.some((notification) => notification.status === 'unread') && <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border-2 border-[#19211e] bg-[#df7040]"></span>}
                 </button>
                 {isNotificationsOpen && (
-                  <section aria-label="Admin notifications" className="absolute right-0 top-full z-30 mt-3 max-h-[min(70vh,32rem)] w-[min(22rem,calc(100vw-2rem))] overflow-y-auto rounded-xl border border-white/10 bg-[#202b28] p-3 shadow-2xl">
-                    <div className="flex items-center justify-between border-b border-white/10 px-2 pb-3">
+                  <section aria-label="Admin notifications" className="fixed left-3 right-3 top-20 z-30 flex max-h-[calc(100dvh-6rem)] flex-col rounded-xl border border-white/10 bg-[#202b28] p-3 shadow-2xl sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-3 sm:max-h-[min(70vh,32rem)] sm:w-[min(22rem,calc(100vw-2rem))]">
+                    <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-2 pb-3">
                       <h2 className="text-sm font-bold text-white">Notifications</h2>
-                      <span className="text-xs text-[#aab7b2]">{notifications.filter((item) => item.status === 'unread').length} unread</span>
+                      <div className="flex items-center gap-3">
+                        <span className="whitespace-nowrap text-xs text-[#aab7b2]">{notifications.filter((item) => item.status === 'unread').length} unread</span>
+                        <button type="button" onClick={() => void clearAllNotifications()} disabled={notifications.length === 0 || isClearingNotifications} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-[#f29a66] transition-colors hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-40">
+                          <Trash2 size={14} />
+                          Clear
+                        </button>
+                      </div>
                     </div>
                     {notificationError && <p role="alert" className="px-2 py-3 text-xs text-rose-300">{notificationError}</p>}
-                    <div className="divide-y divide-white/[0.07]">
+                    <div className="min-h-0 flex-1 divide-y divide-white/[0.07] overflow-y-auto">
                       {notifications.map((notification) => (
                         <button key={notification.id} type="button" onClick={() => void readNotification(notification)} className={`block w-full px-2 py-3 text-left transition-colors hover:bg-white/[0.05] ${notification.status === 'unread' ? 'bg-white/[0.025]' : ''}`}>
                           <span className="flex items-start gap-2">

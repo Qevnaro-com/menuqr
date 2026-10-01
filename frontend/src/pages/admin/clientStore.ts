@@ -158,6 +158,10 @@ export function getNotifications(): Promise<AdminNotification[]> {
   return request<AdminNotification[]>('/admin/notifications');
 }
 
+export function clearNotifications(): Promise<{ deletedCount: number }> {
+  return request<{ deletedCount: number }>('/admin/notifications', { method: 'DELETE' });
+}
+
 export function markNotificationRead(id: string): Promise<{ status: 'read' }> {
   return request<{ status: 'read' }>(
     `/admin/notifications/${encodeURIComponent(id)}/read`,

@@ -337,6 +337,12 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    if (request.method === 'DELETE' && url.pathname === '/api/admin/notifications') {
+      const result = await notificationCollection.deleteMany({});
+      sendJson(response, 200, { deletedCount: result.deletedCount });
+      return;
+    }
+
     const notificationReadMatch = url.pathname.match(
       /^\/api\/admin\/notifications\/([^/]+)\/read$/
     );

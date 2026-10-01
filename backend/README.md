@@ -14,7 +14,7 @@ Copy-Item .env.example .env
 
 Edit `backend/.env` and set `MONGODB_URI` to your local MongoDB URI or MongoDB Atlas connection string. In Atlas, create a database user and allow your IP address in Network Access. Keep `.env` private; it is git-ignored.
 
-For Gmail emails, set `ADMIN_EMAIL` to the admin's destination address, `SMTP_USER` to the sending Gmail account, and `SMTP_APP_PASSWORD` to a Google App Password. Enable 2-Step Verification on the sending account before creating an App Password. New registrations send an admin alert and a customer welcome email containing the selected plan, billing cycle, and price. Email delivery is best-effort and does not delay client creation.
+For email, set `RESEND_API_KEY` from your Resend dashboard and `ADMIN_EMAIL` to the admin's destination address. `RESEND_FROM_EMAIL` defaults to Resend's `onboarding@resend.dev` testing sender; this sender can only deliver to the Resend account's verified email address. To send welcome emails to arbitrary customers in production, verify a domain in Resend and set `RESEND_FROM_EMAIL` to an address on that domain. New registrations send an admin alert and a customer welcome email containing the selected plan, billing cycle, and price. Email delivery is best-effort and does not delay client creation. Set these variables in both local `backend/.env` and the Render backend service environment.
 
 Open two terminals from the repository root:
 

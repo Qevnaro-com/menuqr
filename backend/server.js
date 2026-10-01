@@ -432,7 +432,7 @@ const server = createServer(async (request, response) => {
         await notificationCollection.insertOne(
           createNewUserNotification(client)
         );
-        // SMTP delivery is best-effort and must not hold up the API response.
+        // Email delivery is best-effort and must not hold up the API response.
         void import('./email.js')
           .then(({ sendNewUserAlert, sendClientWelcomeEmail }) =>
             Promise.all([

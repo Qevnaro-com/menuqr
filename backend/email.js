@@ -1,11 +1,18 @@
 import nodemailer from 'nodemailer';
+import dns from 'dns';
+
+// Render ke server par IPv6 network block hota hai, 
+// isliye hum Node.js ko sirf IPv4 (normal IPs) use karne ke liye force kar rahe hain.
+dns.setDefaultResultOrder('ipv4first');
 
 let transporter;
 
 function getTransporter() {
   if (!transporter) {
     transporter = nodemailer.createTransport({
-      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
       auth: {
         user: process.env.SMTP_USER?.trim(),
         pass: process.env.SMTP_APP_PASSWORD?.trim(),

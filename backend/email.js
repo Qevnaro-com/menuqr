@@ -129,29 +129,51 @@ export async function sendClientWelcomeEmail(client) {
     : 'Please contact us to confirm pricing';
 
   const htmlContent = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #fcfcfc;">
-      <div style="text-align: center; margin-bottom: 20px;">
-        <h1 style="color: #2c3e50; margin: 0;">Welcome to Menu QR!</h1>
-        <p style="color: #7f8c8d; font-size: 16px;">We're thrilled to have ${client.businessName} on board.</p>
+    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #f0f0f0;">
+      
+      <!-- Header with Food Image -->
+      <div style="background-image: url('https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=600&auto=format&fit=crop'); background-size: cover; background-position: center; padding: 50px 20px; text-align: center; position: relative;">
+        <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.6);"></div>
+        <div style="position: relative; z-index: 1;">
+          <h1 style="color: #ffffff; margin: 0; font-size: 32px; text-shadow: 2px 2px 4px rgba(0,0,0,0.8);">Welcome to MenuQR! 🍽️</h1>
+          <p style="color: #f1c40f; font-size: 20px; margin-top: 10px; font-weight: bold; text-shadow: 1px 1px 3px rgba(0,0,0,0.8);">${client.businessName}</p>
+        </div>
       </div>
       
-      <div style="background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+      <!-- Content -->
+      <div style="padding: 30px; background-color: #fafafa;">
         <p style="font-size: 16px; color: #333;">Hello <strong>${name}</strong>,</p>
-        <p style="font-size: 16px; color: #555; line-height: 1.5;">Your account for <strong>${client.businessName}</strong> has been successfully registered.</p>
+        <p style="font-size: 16px; color: #555; line-height: 1.6;">Aapka digital menu account successfully register ho gaya hai. Ab aapke customers ek scan se aapka swadisht khana apne phone par dekh payenge! 🎉</p>
         
-        <div style="margin: 25px 0; border-left: 4px solid #3498db; padding-left: 15px; background-color: #f8fbfe; padding-top: 10px; padding-bottom: 10px;">
-          <h3 style="color: #2980b9; margin-top: 0; margin-bottom: 15px;">Your Subscription Details</h3>
-          <p style="margin: 5px 0; color: #444;"><strong>Plan:</strong> <span style="color: #2c3e50;">${client.plan}</span></p>
-          <p style="margin: 5px 0; color: #444;"><strong>Billing Cycle:</strong> <span style="color: #2c3e50;">${client.billingCycle}</span></p>
-          <p style="margin: 5px 0; color: #444;"><strong>Price:</strong> <span style="color: #2c3e50;">${price}</span></p>
+        <div style="margin: 30px 0; background-color: #ffffff; border-radius: 8px; padding: 25px; border-left: 5px solid #e67e22; box-shadow: 0 2px 5px rgba(0,0,0,0.02);">
+          <h3 style="color: #e67e22; margin-top: 0; margin-bottom: 20px; font-size: 18px;">📋 Your Subscription Details</h3>
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; color: #666; width: 120px;"><strong>Plan:</strong></td>
+              <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; color: #2c3e50; font-weight: bold;">${client.plan}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; color: #666;"><strong>Cycle:</strong></td>
+              <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; color: #2c3e50; font-weight: bold;">${client.billingCycle}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 0; color: #666;"><strong>Price:</strong></td>
+              <td style="padding: 10px 0; color: #2c3e50; font-weight: bold; font-size: 18px;">${price}</td>
+            </tr>
+          </table>
         </div>
         
-        <p style="font-size: 15px; color: #555; line-height: 1.5;">If you have any questions or need help setting up your digital menu, simply reply to this email. We're here to help!</p>
+        <p style="font-size: 15px; color: #666; line-height: 1.6;">Agar aapko menu setup karne me koi bhi madad chahiye, to bas is email par reply karein. Hum aapki madad ke liye hamesha taiyar hain.</p>
+        
+        <div style="margin-top: 40px; text-align: center;">
+          <a href="https://menuqr-9edk.onrender.com" style="background-color: #e67e22; color: #ffffff; text-decoration: none; padding: 14px 30px; border-radius: 25px; font-weight: bold; display: inline-block; font-size: 16px; box-shadow: 0 4px 6px rgba(230,126,34,0.3);">Go to Dashboard</a>
+        </div>
       </div>
       
-      <div style="margin-top: 30px; text-align: center; border-top: 1px solid #eee; padding-top: 20px;">
-        <p style="color: #888; font-size: 14px; margin: 5px 0;">Thank you for choosing Menu QR.</p>
-        <p style="color: #aaa; font-size: 12px; margin: 5px 0;">&copy; ${new Date().getFullYear()} Menu QR. All rights reserved.</p>
+      <!-- Footer -->
+      <div style="background-color: #2c3e50; padding: 25px; text-align: center;">
+        <p style="color: #ecf0f1; font-size: 15px; margin: 5px 0; font-weight: bold;">Thank you for choosing MenuQR.</p>
+        <p style="color: #95a5a6; font-size: 13px; margin: 10px 0 0 0;">&copy; ${new Date().getFullYear()} MenuQR. All rights reserved.</p>
       </div>
     </div>
   `;

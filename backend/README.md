@@ -14,6 +14,8 @@ Copy-Item .env.example .env
 
 Edit `backend/.env` and set `MONGODB_URI` to your local MongoDB URI or MongoDB Atlas connection string. In Atlas, create a database user and allow your IP address in Network Access. Keep `.env` private; it is git-ignored.
 
+For Gmail emails, set `ADMIN_EMAIL` to the admin's destination address, `SMTP_USER` to the sending Gmail account, and `SMTP_APP_PASSWORD` to a Google App Password. Enable 2-Step Verification on the sending account before creating an App Password. New registrations send an admin alert and a customer welcome email containing the selected plan, billing cycle, and price. Email delivery is best-effort and does not delay client creation.
+
 Open two terminals from the repository root:
 
 ```powershell
@@ -38,6 +40,8 @@ The built-in admin password is `MenuQR@2026!`. Set `ADMIN_PASSWORD` in `backend/
 - `GET /api/admin/clients` lists client records for the admin UI.
 - `GET /api/admin/clients/:id` fetches one client.
 - `POST /api/admin/clients` creates a client.
+- `GET /api/admin/notifications` lists the latest 50 admin notifications.
+- `PATCH /api/admin/notifications/:id/read` marks a notification as read.
 - `PUT /api/admin/clients/:id` updates a client.
 - `DELETE /api/admin/clients/:id` removes a client.
 - `GET /api/public/menus/:slug` returns active customer-facing menu data without owner contact or billing details.

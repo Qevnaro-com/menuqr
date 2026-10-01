@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LayoutDashboard, Utensils, Store, Coffee, QrCode, Settings, Menu, X, ChefHat, Sparkles, Bell, ClipboardPlus, LogOut } from 'lucide-react';
-import { getApiHealth, logoutAdmin } from '../pages/admin/clientStore';
+import { getApiHealth, getNotifications, logoutAdmin, markNotificationRead, type AdminNotification } from '../pages/admin/clientStore';
 import '../App.css';
 
 const navItems = [
@@ -20,6 +20,9 @@ export default function AdminLayout() {
   const [apiStatus, setApiStatus] = useState<'checking' | 'online' | 'offline'>('checking');
   const [logoutError, setLogoutError] = useState('');
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isNotificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState<AdminNotification[]>([]);
+  const [notificationError, setNotificationError] = useState('');
   const location = useLocation();
   const navigate = useNavigate();
   const pageTitle = location.pathname.startsWith('/admin/clients')
@@ -44,6 +47,39 @@ export default function AdminLayout() {
       window.clearInterval(timer);
     };
   }, []);
+
+  useEffect(() => {
+    let isCurrent = true;
+    const loadNotifications = () => {
+      void getNotifications().then((records) => {
+        if (!isCurrent) return;
+        setNotifications(records);
+        setNotificationError('');
+      }).catch((error: unknown) => {
+        if (isCurrent && isNotificationsOpen) {
+          setNotificationError(error instanceof Error ? error.message : 'Could not load notifications.');
+        }
+      });
+    };
+    loadNotifications();
+    const timer = window.setInterval(loadNotifications, 30_000);
+    return () => {
+      isCurrent = false;
+      window.clearInterval(timer);
+    };
+  }, [isNotificationsOpen]);
+
+  async function readNotification(notification: AdminNotification) {
+    if (notification.status === 'read') return;
+    try {
+      await markNotificationRead(notification.id);
+      setNotifications((current) => current.map((item) =>
+        item.id === notification.id ? { ...item, status: 'read', readAt: new Date().toISOString() } : item
+      ));
+    } catch (error) {
+      setNotificationError(error instanceof Error ? error.message : 'Could not update notification.');
+    }
+  }
 
   async function signOut() {
     setIsLoggingOut(true);
@@ -153,10 +189,36 @@ export default function AdminLayout() {
             </div>
             
             <div className="flex items-center gap-3 sm:gap-5">
-              <button aria-label="Notifications" className="relative rounded-lg p-2 text-[#a5b2ac] transition-colors hover:bg-white/10 hover:text-white">
-                 <Bell size={22} />
-                 <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border-2 border-[#19211e] bg-[#df7040]"></span>
-              </button>
+              <div className="relative">
+                <button type="button" aria-label="Notifications" aria-expanded={isNotificationsOpen} onClick={() => setNotificationsOpen((open) => !open)} className="relative rounded-lg p-2 text-[#a5b2ac] transition-colors hover:bg-white/10 hover:text-white">
+                  <Bell size={22} />
+                  {notifications.some((notification) => notification.status === 'unread') && <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border-2 border-[#19211e] bg-[#df7040]"></span>}
+                </button>
+                {isNotificationsOpen && (
+                  <section aria-label="Admin notifications" className="absolute right-0 top-full z-30 mt-3 max-h-[min(70vh,32rem)] w-[min(22rem,calc(100vw-2rem))] overflow-y-auto rounded-xl border border-white/10 bg-[#202b28] p-3 shadow-2xl">
+                    <div className="flex items-center justify-between border-b border-white/10 px-2 pb-3">
+                      <h2 className="text-sm font-bold text-white">Notifications</h2>
+                      <span className="text-xs text-[#aab7b2]">{notifications.filter((item) => item.status === 'unread').length} unread</span>
+                    </div>
+                    {notificationError && <p role="alert" className="px-2 py-3 text-xs text-rose-300">{notificationError}</p>}
+                    <div className="divide-y divide-white/[0.07]">
+                      {notifications.map((notification) => (
+                        <button key={notification.id} type="button" onClick={() => void readNotification(notification)} className={`block w-full px-2 py-3 text-left transition-colors hover:bg-white/[0.05] ${notification.status === 'unread' ? 'bg-white/[0.025]' : ''}`}>
+                          <span className="flex items-start gap-2">
+                            {notification.status === 'unread' && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#df7040]" />}
+                            <span className="min-w-0">
+                              <span className="block text-sm font-semibold text-white">{notification.message}</span>
+                              <span className="mt-1 block text-xs text-[#aab7b2]">{notification.user.email || notification.user.phone || 'No contact details'}</span>
+                              <span className="mt-1 block text-[11px] text-[#87958e]">{new Date(notification.createdAt).toLocaleString()}</span>
+                            </span>
+                          </span>
+                        </button>
+                      ))}
+                      {notifications.length === 0 && !notificationError && <p className="px-2 py-5 text-sm text-[#aab7b2]">No notifications yet.</p>}
+                    </div>
+                  </section>
+                )}
+              </div>
               <div className="h-8 w-px bg-white/10" />
               <div className="group flex cursor-pointer items-center gap-3">
                 <div className="text-right hidden sm:block">

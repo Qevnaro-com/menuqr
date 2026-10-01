@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
 import { MongoClient } from 'mongodb';
+import { createNewUserNotification } from './notifications.js';
 
 const directory = dirname(fileURLToPath(import.meta.url));
 loadEnv({ path: join(directory, '.env') });
@@ -174,6 +175,7 @@ function toPublicMenu(client) {
 let mongoClient;
 let clientCollection;
 let adminSessions;
+let notificationCollection;
 
 async function initializeStore() {
   const uri = process.env.MONGODB_URI;
@@ -188,11 +190,14 @@ async function initializeStore() {
   const database = mongoClient.db(process.env.MONGODB_DATABASE || 'menuqr');
   clientCollection = database.collection('clients');
   adminSessions = database.collection('admin_sessions');
+  notificationCollection = database.collection('notifications');
   await Promise.all([
     clientCollection.createIndex({ id: 1 }, { unique: true }),
     clientCollection.createIndex({ menuSlug: 1 }, { unique: true }),
     adminSessions.createIndex({ token: 1 }, { unique: true }),
     adminSessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+    notificationCollection.createIndex({ id: 1 }, { unique: true }),
+    notificationCollection.createIndex({ createdAt: -1 }),
   ]);
 
   if ((await clientCollection.estimatedDocumentCount()) === 0) {
@@ -232,11 +237,11 @@ const server = createServer(async (request, response) => {
     response.setHeader('Access-Control-Allow-Origin', requestOrigin);
     response.setHeader(
       'Access-Control-Allow-Headers',
-      'Content-Type, Authorization'
+      'Content-Type, Authorization, X-MenuQR-Import'
     );
     response.setHeader(
       'Access-Control-Allow-Methods',
-      'GET, POST, PUT, DELETE, OPTIONS'
+      'GET, POST, PUT, PATCH, DELETE, OPTIONS'
     );
     response.setHeader('Vary', 'Origin');
   }
@@ -322,6 +327,29 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    if (request.method === 'GET' && url.pathname === '/api/admin/notifications') {
+      const notifications = await notificationCollection
+        .find({}, { projection: { _id: 0 } })
+        .sort({ createdAt: -1 })
+        .limit(50)
+        .toArray();
+      sendJson(response, 200, notifications);
+      return;
+    }
+
+    const notificationReadMatch = url.pathname.match(
+      /^\/api\/admin\/notifications\/([^/]+)\/read$/
+    );
+    if (request.method === 'PATCH' && notificationReadMatch) {
+      const result = await notificationCollection.updateOne(
+        { id: decodeURIComponent(notificationReadMatch[1]) },
+        { $set: { status: 'read', readAt: new Date().toISOString() } }
+      );
+      if (result.matchedCount === 0) throw apiError(404, 'Notification not found.');
+      sendJson(response, 200, { status: 'read' });
+      return;
+    }
+
     const adminClientMatch = url.pathname.match(
       /^\/api\/admin\/clients\/([^/]+)$/
     );
@@ -400,6 +428,22 @@ const server = createServer(async (request, response) => {
         throw apiError(409, 'That menu URL is already in use.');
       }
       await clientCollection.insertOne(client);
+      if (request.headers['x-menuqr-import'] !== 'legacy') {
+        await notificationCollection.insertOne(
+          createNewUserNotification(client)
+        );
+        // SMTP delivery is best-effort and must not hold up the API response.
+        void import('./email.js')
+          .then(({ sendNewUserAlert, sendClientWelcomeEmail }) =>
+            Promise.all([
+              sendNewUserAlert(client),
+              sendClientWelcomeEmail(client),
+            ])
+          )
+          .catch((error) => {
+            console.error('[email] Could not start registration emails:', error.message);
+          });
+      }
       sendJson(response, 201, client);
       return;
     }

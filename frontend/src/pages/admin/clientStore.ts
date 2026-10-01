@@ -64,6 +64,17 @@ export interface ApiHealth {
   clients: number;
 }
 
+export interface AdminNotification {
+  id: string;
+  type: 'new-user';
+  user: { clientId: string; name: string; email: string; phone: string };
+  message: string;
+  source: string;
+  status: 'unread' | 'read';
+  createdAt: string;
+  readAt: string | null;
+}
+
 export interface AdminSession {
   authenticated: boolean;
 }
@@ -118,6 +129,7 @@ async function migrateLegacyClients(clients: ClientRecord[]): Promise<ClientReco
           await request<ClientRecord>('/admin/clients', {
             method: 'POST',
             body: JSON.stringify(legacyClient),
+            headers: { 'X-MenuQR-Import': 'legacy' },
           });
         } catch (error) {
           if (!(error instanceof Error) || !error.message.includes('already in use')) throw error;
@@ -140,6 +152,17 @@ export async function getClients(): Promise<ClientRecord[]> {
 
 export function getApiHealth(): Promise<ApiHealth> {
   return request<ApiHealth>('/health');
+}
+
+export function getNotifications(): Promise<AdminNotification[]> {
+  return request<AdminNotification[]>('/admin/notifications');
+}
+
+export function markNotificationRead(id: string): Promise<{ status: 'read' }> {
+  return request<{ status: 'read' }>(
+    `/admin/notifications/${encodeURIComponent(id)}/read`,
+    { method: 'PATCH' }
+  );
 }
 
 export function getAdminSession(): Promise<AdminSession> {

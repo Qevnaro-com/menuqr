@@ -1,10 +1,131 @@
 import { useState } from 'react';
-import { ImagePlus, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Download, ImagePlus, Pencil, Plus, Trash2, Upload, X } from 'lucide-react';
 import type { MenuDietType, MenuItemRecord } from './clientStore';
 
 const categories = ['Starters', 'Main Course', 'Breads', 'Desserts', 'Beverages', 'Other'];
+const sizeCategories = ['Breads', 'Beverages'];
 const inputClass = 'mt-2 w-full rounded-lg border border-white/10 bg-[#17211e] px-3.5 py-3 text-sm text-white outline-none transition placeholder:text-[#728079] focus:border-[#e8783c] focus:ring-2 focus:ring-[#e8783c]/20';
 const labelClass = 'text-sm font-semibold text-[#dce5df]';
+const csvTemplate = 'Item Name,Category,Price,Description,Image Name or URL,Veg/Non-Veg,Half Price,Full Price,Reg Price,Med Price,Large Price\n';
+
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = '';
+  let quoted = false;
+  const source = text.replace(/^\uFEFF/, '');
+
+  for (let index = 0; index < source.length; index += 1) {
+    const character = source[index];
+    if (quoted) {
+      if (character === '"' && source[index + 1] === '"') {
+        cell += '"';
+        index += 1;
+      } else if (character === '"') {
+        quoted = false;
+      } else {
+        cell += character;
+      }
+    } else if (character === '"') {
+      quoted = true;
+    } else if (character === ',') {
+      row.push(cell.trim());
+      cell = '';
+    } else if (character === '\n' || character === '\r') {
+      if (character === '\r' && source[index + 1] === '\n') index += 1;
+      row.push(cell.trim());
+      if (row.some((value) => value)) rows.push(row);
+      row = [];
+      cell = '';
+    } else {
+      cell += character;
+    }
+  }
+  row.push(cell.trim());
+  if (row.some((value) => value)) rows.push(row);
+  if (quoted) throw new Error('CSV has an unclosed quoted value.');
+  return rows;
+}
+
+function csvMenuItems(text: string): MenuItemRecord[] {
+  const rows = parseCsv(text);
+  if (rows.length < 2) throw new Error('CSV must include a header and at least one menu item.');
+  const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const headers = rows[0].map(normalize);
+  const column = (...names: string[]) => headers.findIndex((header) => names.includes(header));
+  const nameColumn = column('itemname', 'name');
+  const categoryColumn = column('category');
+  if (nameColumn < 0 || categoryColumn < 0) throw new Error('CSV needs "Item Name" and "Category" columns.');
+
+  const value = (row: string[], ...names: string[]) => {
+    const index = column(...names);
+    return index < 0 ? '' : row[index] ?? '';
+  };
+  const readPrice = (row: string[], ...names: string[]) => {
+    const price = value(row, ...names);
+    if (price && (!Number.isFinite(Number(price)) || Number(price) < 0)) {
+      throw new Error(`Row price must be a number zero or greater.`);
+    }
+    return price;
+  };
+
+  return rows.slice(1).map((row, index) => {
+    const rowNumber = index + 2;
+    try {
+      const name = row[nameColumn] ?? '';
+      const category = categories.find((option) => normalize(option) === normalize(row[categoryColumn] ?? ''));
+      if (!name) throw new Error('Item Name is required.');
+      if (!category) throw new Error(`Category must be one of: ${categories.join(', ')}.`);
+
+      const halfPrice = readPrice(row, 'halfprice', 'half');
+      const fullPrice = readPrice(row, 'fullprice', 'full');
+      const regPrice = readPrice(row, 'regularprice', 'regprice', 'reg');
+      const medPrice = readPrice(row, 'mediumprice', 'medprice', 'med');
+      const largePrice = readPrice(row, 'largeprice', 'large');
+      const price = readPrice(row, 'price');
+      const pricingType = regPrice || medPrice || largePrice
+        ? 'sizes'
+        : halfPrice || fullPrice
+          ? 'half-full'
+          : 'single';
+      if (pricingType === 'sizes' && !sizeCategories.includes(category)) throw new Error('Reg/Med/Large prices are only supported for Breads and Beverages.');
+      if (pricingType === 'half-full' && sizeCategories.includes(category)) throw new Error('Use Reg/Med/Large prices for Breads and Beverages.');
+      if (pricingType === 'sizes' && !regPrice && !medPrice && !largePrice) throw new Error('Add at least one size price.');
+      if (pricingType === 'half-full' && !halfPrice && !fullPrice) throw new Error('Add at least one Half or Full price.');
+      if (pricingType === 'single' && !price) throw new Error('Add a Price, Half/Full price, or size price.');
+
+      const rawDiet = normalize(value(row, 'vegnonveg', 'diet', 'diettype'));
+      const dietType: MenuDietType = rawDiet === 'nonveg' || rawDiet === 'nonvegetarian'
+        ? 'non-veg'
+        : rawDiet === 'vegan'
+          ? 'vegan'
+          : rawDiet === 'veg' || rawDiet === 'vegetarian' || !rawDiet
+            ? 'veg'
+            : (() => { throw new Error('Veg/Non-Veg must be Veg, Non-Veg, or Vegan.'); })();
+      const imageValue = value(row, 'imagenameorurl', 'imageurl', 'image');
+      const image = /^https?:\/\//i.test(imageValue) ? imageValue : '';
+
+      return {
+        id: crypto.randomUUID(),
+        name,
+        description: value(row, 'description'),
+        price: pricingType === 'single' ? price : '',
+        pricingType,
+        halfPrice,
+        fullPrice,
+        regPrice,
+        medPrice,
+        largePrice,
+        category,
+        dietType,
+        image,
+        available: true,
+      };
+    } catch (importError) {
+      throw new Error(`Row ${rowNumber}: ${importError instanceof Error ? importError.message : 'Invalid menu item.'}`);
+    }
+  });
+}
 
 function blankItem(): MenuItemRecord {
   return { id: '', name: '', description: '', price: '', category: 'Main Course', dietType: 'veg', image: '', available: true };
@@ -31,6 +152,28 @@ export default function MenuItemsEditor({ items, onChange }: { items: MenuItemRe
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [isCompressing, setIsCompressing] = useState(false);
+  const [importMessage, setImportMessage] = useState('');
+
+  async function importCsv(file?: File) {
+    if (!file) return;
+    setImportMessage('');
+    try {
+      const importedItems = csvMenuItems(await file.text());
+      onChange([...items, ...importedItems]);
+      setImportMessage(`${importedItems.length} menu ${importedItems.length === 1 ? 'item' : 'items'} imported.`);
+    } catch (importError) {
+      setImportMessage(importError instanceof Error ? importError.message : 'Could not import this CSV.');
+    }
+  }
+
+  function downloadCsvTemplate() {
+    const url = URL.createObjectURL(new Blob([csvTemplate], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'menuqr-menu-template.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+  }
 
   async function chooseImage(file?: File) {
     if (!file) return;
@@ -94,8 +237,14 @@ export default function MenuItemsEditor({ items, onChange }: { items: MenuItemRe
           <h2 className="font-bold text-white">Menu items</h2>
           <p className="mt-1 text-xs text-[#94a39d]">Add a photo, price, and details that guests will see on the public menu.</p>
         </div>
-        <span className="rounded-full border border-white/10 px-3 py-1.5 text-xs font-semibold text-[#b8c4be]">{items.length} {items.length === 1 ? 'item' : 'items'}</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={downloadCsvTemplate} className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-[#c3cec8] transition hover:bg-white/[0.06]"><Download size={15} />CSV template</button>
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[#e8783c] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#f18b50]"><Upload size={15} />Upload CSV<input type="file" accept=".csv,text/csv" className="sr-only" onChange={(event) => { void importCsv(event.currentTarget.files?.[0]); event.currentTarget.value = ''; }} /></label>
+          <span className="rounded-full border border-white/10 px-3 py-1.5 text-xs font-semibold text-[#b8c4be]">{items.length} {items.length === 1 ? 'item' : 'items'}</span>
+        </div>
       </div>
+      {importMessage && <p role="status" className={`-mt-3 mb-5 text-xs font-medium ${importMessage.includes('imported.') ? 'text-emerald-300' : 'text-rose-300'}`}>{importMessage}</p>}
+      <p className="-mt-3 mb-5 text-xs text-[#94a39d]">Use existing categories. Add Half/Full or Reg/Med/Large price columns when needed; image columns accept URLs.</p>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_230px]">
         <div className="space-y-3">
@@ -154,15 +303,15 @@ export default function MenuItemsEditor({ items, onChange }: { items: MenuItemRe
           <label className={`${labelClass} mt-4 block`}>Category<select className={inputClass} value={draft.category} onChange={(event) => setDraft((current) => {
             const newCat = event.target.value;
             let pt = current.pricingType || 'single';
-            if (newCat === 'Breads' && pt === 'half-full') pt = 'sizes';
-            if (newCat !== 'Breads' && pt === 'sizes') pt = 'half-full';
+            if (sizeCategories.includes(newCat) && pt === 'half-full') pt = 'sizes';
+            if (!sizeCategories.includes(newCat) && pt === 'sizes') pt = 'half-full';
             return { ...current, category: newCat, pricingType: pt as any };
           })}>{categories.map((category) => <option key={category}>{category}</option>)}</select></label>
           
           <label className={`${labelClass} mt-4 block`}>Pricing Options
             <select className={inputClass} value={draft.pricingType || 'single'} onChange={(event) => setDraft((current) => ({ ...current, pricingType: event.target.value as any }))}>
               <option value="single">Single Price (None)</option>
-              {draft.category === 'Breads' ? (
+              {sizeCategories.includes(draft.category) ? (
                 <option value="sizes">Sizes (Reg, Med, Large)</option>
               ) : (
                 <option value="half-full">Portions (Half, Full)</option>

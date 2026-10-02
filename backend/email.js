@@ -162,12 +162,44 @@ export async function sendClientWelcomeEmail(client) {
             </tr>
           </table>
         </div>
-        
-        <p style="font-size: 15px; color: #666; line-height: 1.6;">Agar aapko menu setup karne me koi bhi madad chahiye, to bas is email par reply karein. Hum aapki madad ke liye hamesha taiyar hain.</p>
-        
-        <div style="margin-top: 40px; text-align: center;">
-          <a href="https://menuqr-9edk.onrender.com" style="background-color: #e67e22; color: #ffffff; text-decoration: none; padding: 14px 30px; border-radius: 25px; font-weight: bold; display: inline-block; font-size: 16px; box-shadow: 0 4px 6px rgba(230,126,34,0.3);">Go to Dashboard</a>
+
+        <!-- Trust Indicators Section -->
+        <div style="margin: 30px 0;">
+          <h3 style="color: #2c3e50; font-size: 18px; text-align: center; margin-bottom: 20px;">Why Top Restaurants Trust Us 🤝</h3>
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 15px; width: 50%; text-align: center; border-right: 1px solid #eee; border-bottom: 1px solid #eee;">
+                <span style="font-size: 24px;">⚡</span>
+                <p style="margin: 5px 0 0 0; font-weight: bold; color: #333; font-size: 14px;">Superfast Loading</p>
+                <p style="margin: 3px 0 0 0; font-size: 12px; color: #777;">No delays for your customers.</p>
+              </td>
+              <td style="padding: 15px; width: 50%; text-align: center; border-bottom: 1px solid #eee;">
+                <span style="font-size: 24px;">🔒</span>
+                <p style="margin: 5px 0 0 0; font-weight: bold; color: #333; font-size: 14px;">100% Secure</p>
+                <p style="margin: 3px 0 0 0; font-size: 12px; color: #777;">Bank-level security.</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 15px; width: 50%; text-align: center; border-right: 1px solid #eee;">
+                <span style="font-size: 24px;">📞</span>
+                <p style="margin: 5px 0 0 0; font-weight: bold; color: #333; font-size: 14px;">Dedicated Support</p>
+                <p style="margin: 3px 0 0 0; font-size: 12px; color: #777;">Hum hamesha aapke sath hain.</p>
+              </td>
+              <td style="padding: 15px; width: 50%; text-align: center;">
+                <span style="font-size: 24px;">⭐</span>
+                <p style="margin: 5px 0 0 0; font-weight: bold; color: #333; font-size: 14px;">Premium Quality</p>
+                <p style="margin: 3px 0 0 0; font-size: 12px; color: #777;">Best UI experience.</p>
+              </td>
+            </tr>
+          </table>
         </div>
+
+        <div style="background-color: #eafaf1; border-radius: 8px; padding: 20px; text-align: center; border: 1px solid #a3e4d7;">
+          <h4 style="margin: 0 0 10px 0; color: #148f77; font-size: 16px;">What's Next? 🚀</h4>
+          <p style="margin: 0; color: #117a65; font-size: 14px; line-height: 1.5;">Humari team jaldi hi aapse contact karegi. Aap bas apna menu ready rakhiye, hum sab setup kar denge!</p>
+        </div>
+        
+        <p style="font-size: 15px; color: #666; line-height: 1.6; margin-top: 30px; text-align: center;">Agar aapko menu setup karne me koi bhi madad chahiye, to bas is email par reply karein. Hum aapki madad ke liye hamesha taiyar hain.</p>
       </div>
       
       <!-- Footer -->
@@ -192,10 +224,19 @@ export async function sendClientWelcomeEmail(client) {
       `Billing cycle: ${client.billingCycle}`,
       `Price: ${price}`,
       '',
+      'Why Top Restaurants Trust Us:',
+      '- Superfast Loading',
+      '- 100% Secure Data',
+      '- Dedicated Support',
+      '- Premium Quality',
+      '',
+      'What\\'s Next?',
+      'Humari team jaldi hi aapse contact karegi. Aap bas apna menu ready rakhiye, hum sab setup kar denge!',
+      '',
       'If you have questions about your subscription, reply to this email.',
       '',
       'Thank you,',
-      'Menu QR',
+      'Menu QR Team',
     ].join('\n'),
   }, `customer welcome email for ${client.businessName}`);
 }

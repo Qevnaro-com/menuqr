@@ -346,7 +346,8 @@
 .menu-dish {
   position: relative;
   display: flex;
-  height: 180px;
+  min-height: 180px;
+  height: auto;
   overflow: hidden;
   border-radius: 20px;
   background: var(--dish-bg, #f24e61); /* Dynamic background color based on category */
@@ -640,7 +641,8 @@
   }
 
   .menu-dish {
-    height: 160px;
+    min-height: 160px;
+    height: auto;
     padding: 12px;
   }
 
@@ -656,7 +658,7 @@
 
   .menu-dish-description {
     font-size: 11px;
-    -webkit-line-clamp: 1;
+    -webkit-line-clamp: 2;
   }
 
   .menu-dish-image-container {
